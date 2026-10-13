@@ -1,0 +1,1410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Devlog browser</title>
+<style>
+/* Dark by default; light only with data-theme=light on <html>. */
+:root{--bg:#111113;--side:#16161a;--fg:#e9e9ee;--muted:#9a9aa5;--card:#1d1d22;--line:#2b2b32;--accent:#f0875a;--soft:#33201a;
+--hover:#24242a;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--info:#7aa7ff;--idle:#6b6b73;color-scheme:dark}
+:root[data-theme=light]{--bg:#f7f6f2;--side:#efede7;--fg:#1c1c1e;--muted:#6a6a70;--card:#fff;--line:#e0ddd3;--accent:#b4441b;--soft:#f6e3d7;
+--hover:#e6e3da;--ok:#1d7a3e;--warn:#a35a00;--bad:#b42318;--info:#2559a8;--idle:#8a8a90;color-scheme:light}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;display:grid;grid-template-columns:var(--sw,320px) 1fr;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+
+/* sidebar */
+aside{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;height:100vh}
+.brand{padding:14px 16px 10px;display:flex;align-items:baseline;gap:8px}
+.brand b{font-size:16px;letter-spacing:-.01em}.brand span{color:var(--muted);font-size:12px;margin-left:auto}
+.search{margin:0 12px 8px;position:relative}
+.search input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--line);border-radius:8px;background:var(--card);outline:none}
+.search input:focus{border-color:var(--accent)}
+.search svg{position:absolute;left:9px;top:9px;width:14px;height:14px;color:var(--muted)}
+.search kbd{position:absolute;right:8px;top:7px;font:11px Consolas,monospace;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.tabs{display:flex;gap:2px;margin:0 12px 6px;background:var(--hover);padding:3px;border-radius:9px}
+.tabs button{flex:1;border:0;background:none;padding:5px 0;border-radius:7px;cursor:pointer;color:var(--muted);font-size:13px}
+.tabs button.on{background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.35)}
+nav{overflow-y:auto;flex:1;padding:4px 8px 24px}
+.item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;cursor:pointer;min-width:0}
+.item:hover{background:var(--hover)}
+.item.on{background:var(--soft);color:var(--accent)}
+.item .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.item .d{color:var(--muted);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item .n{color:var(--muted);font-size:12px}
+.proj{margin-top:8px}
+.proj>.item{font-weight:600}
+.group{margin-left:14px;border-left:1px solid var(--line);padding-left:4px}
+.ghead{display:flex;align-items:center;gap:6px;padding:5px 8px 3px;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;user-select:none}
+.ghead:hover{color:var(--fg)}
+.chev{width:10px;transition:transform .15s;flex:none}
+.closed>.ghead .chev,.proj.closed>.item .chev,.ftree.closed>.frow .chev{transform:rotate(-90deg)}
+.closed>.gbody{display:none}
+/* feature groups: a chevron toggles, the name navigates; leaves line up with group names */
+.frow{display:flex;align-items:center}.frow .item{flex:1;min-width:0}
+.tw{border:0;background:none;padding:6px 2px 6px 6px;cursor:pointer;color:var(--muted);display:flex}.tw:hover{color:var(--fg)}
+.ftree>.gbody{margin-left:12px;border-left:1px solid var(--line);padding-left:2px}
+.flist>.item,.ftree>.gbody>.item{margin-left:18px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--idle)}
+.s-done{background:var(--ok)}.s-partial,.s-in-progress{background:var(--warn)}.s-blocked,.s-abandoned{background:var(--bad)}
+.s-planned,.s-idea{background:var(--info)}.s-parked{background:var(--idle)}
+.empty{color:var(--muted);font-style:italic;padding:6px 10px;font-size:13px}
+.day{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;padding:12px 8px 3px}
+.hl{background:var(--soft);color:var(--accent);border-radius:2px}
+.foot{border-top:1px solid var(--line);padding:8px 14px;color:var(--muted);font-size:12px;display:flex;gap:10px}
+.foot a{text-decoration:underline}
+
+/* main */
+main{display:flex;flex-direction:column;min-width:0;height:100vh}
+header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg);min-height:48px}
+header .title{flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+header .title b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kind{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--card);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn[disabled]{opacity:.4;cursor:default;border-color:var(--line)}
+.btn svg{width:14px;height:14px}
+#menu{display:none}
+.view{flex:1;min-height:0;position:relative}
+iframe{border:0;width:100%;height:100%;display:block;background:var(--bg)}
+#gallery{position:absolute;inset:0;overflow-y:auto;padding:20px 16px 60px;display:none}
+#gallery .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+#gallery h1{font-size:22px;margin:0 auto 0 0}
+#gallery select{padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.tile:hover{border-color:var(--accent)}
+.tile .m{aspect-ratio:16/10;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.tile img,.tile video{width:100%;height:100%;object-fit:cover;object-position:top}
+.tile .play{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 7px;border-radius:999px}
+.tile .c{padding:8px 10px;font-size:13px}
+.tile .s{color:var(--muted);font-size:12px;margin-top:3px}
+
+/* command palette */
+#cmdk{width:100%;text-align:left;padding:7px 96px 7px 30px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);cursor:text}
+#cmdk:hover{border-color:var(--accent)}
+.search kbd{right:8px;top:8px}
+
+#pal{position:fixed;inset:0;z-index:15;background:rgba(0,0,0,.55);display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px}
+.pal-box{width:min(720px,100%);max-height:72vh;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.6);overflow:hidden}
+.pal-top{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+#pal-q{flex:1;min-width:0;border:0;background:none;font-size:16px;outline:none;padding:4px 2px}
+#pal-crumb:empty{display:none}
+#pal-crumb{display:inline-flex;gap:4px;flex-wrap:wrap;max-width:50%}
+#pal-crumb span{font-size:12px;background:var(--soft);color:var(--accent);border-radius:999px;padding:2px 9px;white-space:nowrap}
+#pal-list{overflow-y:auto;padding:6px}
+.pal-sec{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:8px 10px 4px}
+.pal-it{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer}
+.pal-it.on{background:var(--soft)}
+.pal-it .ic{width:20px;text-align:center;color:var(--muted);flex:none;font-size:13px}
+.pal-it.on .ic{color:var(--accent)}
+.pal-it .tt{flex:1;min-width:0}
+.pal-it .tt b{font-weight:600}
+.pal-it .sub{display:block;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pal-it .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pal-empty{color:var(--muted);padding:14px 10px}
+.pal-foot{display:flex;gap:14px;justify-content:space-between;padding:7px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+dialog#descdlg{width:min(720px,94vw);border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);padding:0}
+dialog#descdlg::backdrop{background:rgba(0,0,0,.6)}
+#descform{padding:18px 20px}#descform h2{margin:0;font-size:18px}
+#ds-summary,#ds-what{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin:0 0 12px;font-size:14px;line-height:1.5;font-family:inherit}
+#ds-what{resize:vertical}#ds-summary:focus,#ds-what:focus{outline:none;border-color:var(--accent)}
+/* dictation (local Whisper through the server) */
+body:not(.stt) .stt-only{display:none!important}
+.fieldhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}.fieldhead .lbl{margin:0}
+.mic{--lvl:0;position:relative;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--card);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--muted);padding:0}
+.mic:hover{border-color:var(--accent);color:var(--fg)}
+.mic::before{content:"";width:14px;height:14px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='5' y='1' width='6' height='9' rx='3'/%3E%3Cpath d='M3 7.5a5 5 0 0010 0M8 12.5V15M5.5 15h5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='5' y='1' width='6' height='9' rx='3'/%3E%3Cpath d='M3 7.5a5 5 0 0010 0M8 12.5V15M5.5 15h5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.mic.rec{background:var(--bad);border-color:var(--bad);color:#fff;box-shadow:0 0 0 calc(2px + var(--lvl) * 9px) rgba(248,113,113,.28)}
+.mic.busy{color:var(--accent);border-color:var(--accent)}
+.mic.busy::before{-webkit-mask:none;mask:none;width:12px;height:12px;border-radius:50%;background:none;border:2px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.mic .secs{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10.5px;color:var(--bad);white-space:nowrap}
+.mic-search{position:absolute;right:58px;top:5px;width:24px;height:24px;border:0;background:none}
+.mic-search.rec{background:var(--bad)}
+
+dialog#notedlg{width:min(620px,94vw);border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);padding:0}
+dialog#notedlg::backdrop{background:rgba(0,0,0,.6)}
+#noteform{padding:18px 20px}#noteform h2{margin:0;font-size:18px}
+#nd-target{margin:0 0 10px}
+#nd-name{width:100%;margin:0 0 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+#nd-text{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14px;line-height:1.5;font-family:inherit;resize:vertical}
+#nd-name:focus,#nd-text:focus{outline:none;border-color:var(--accent)}
+/* dev tool: only when served by devlog_server.py */
+#authbar,.warnbox{margin:0 12px 8px;padding:8px 10px;border:1px solid var(--warn);border-radius:8px;background:rgba(251,191,36,.08);font-size:12.5px}
+#authbar .btn,.warnbox .btn{margin-top:6px}
+.warnbox{margin:0 0 12px}
+[hidden]{display:none!important}
+body:not(.live) .live-only{display:none!important}
+#actions{display:flex;gap:6px;align-items:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a0f0a;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.sel{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:4px 8px;font-size:13px;cursor:pointer}
+.sel:hover{border-color:var(--accent)}
+#runview{position:absolute;inset:0;overflow-y:auto;padding:20px 16px 60px;display:none}
+#runview h1{font-size:22px;margin:0 0 4px}
+.rmeta{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:13px;margin:6px 0 14px}
+.rbtns{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 14px}
+.panel h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.panel pre{white-space:pre-wrap;margin:0;font:13px/1.5 Consolas,"Cascadia Mono",monospace;overflow-wrap:anywhere}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{padding:6px 0;border-bottom:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;font-size:13.5px}
+.feed li:last-child{border-bottom:0}
+.feed .who{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:8px}
+.feed .tool{color:var(--muted);font:12.5px Consolas,monospace}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 9px;border-radius:999px;background:var(--hover)}
+.st-working .dot,.st-starting .dot,.st-running .dot{background:var(--warn);animation:pulse 1.2s infinite}
+.st-waiting .dot{background:var(--info)}.st-ended .dot{background:var(--ok)}.st-failed .dot{background:var(--bad)}
+@keyframes pulse{50%{opacity:.35}}
+dialog#rundlg{width:min(760px,94vw);border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--fg);padding:0}
+dialog#rundlg::backdrop{background:rgba(0,0,0,.6)}
+#runform{padding:18px 20px}
+#runform h2{margin:0;font-size:18px}
+.rd-sub{color:var(--muted);margin:4px 0 12px;font-size:13px}
+.lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+#rd-prompt{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font:13px/1.5 Consolas,"Cascadia Mono",monospace;resize:vertical}
+#rd-prompt:focus{outline:none;border-color:var(--accent)}
+.rd-row{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin:12px 0 6px}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:0}
+legend{font-size:12px;color:var(--muted);padding:0 4px}
+fieldset label{display:block;padding:3px 0;cursor:pointer}
+.hint{display:block;color:var(--muted);font-size:12px;margin-left:22px}
+fieldset .hint{margin-left:22px}#rd-perm-hint{margin:6px 0 0}
+.chk{display:block;padding:4px 0;cursor:pointer}
+.rd-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+#ctx{position:fixed;z-index:20;display:none;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#ctx button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+#ctx button:hover{background:var(--hover)}#ctx button.cur{color:var(--accent)}
+#ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+#ctx .head{font-size:11px;color:var(--muted);padding:4px 10px;text-transform:uppercase;letter-spacing:.06em}
+#toast{position:fixed;right:16px;bottom:16px;z-index:30;max-width:420px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none}
+#toast.err{border-left-color:var(--bad)}
+@media (max-width:760px){
+  .rd-row{grid-template-columns:1fr}
+  #actions .lbl-sm{display:none}
+  body{grid-template-columns:1fr}
+  aside{position:fixed;inset:0 20% 0 0;z-index:5;transform:translateX(-105%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.3)}
+  body.nav-open aside{transform:none}
+  #menu{display:inline-flex}
+  .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><b>Game Dev devlog</b><span id="gen"></span></div>
+  <div class="search">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+    <button type="button" id="cmdk" aria-label="Open the command palette">Search or do anything…</button>
+    <kbd>Ctrl K</kbd>
+    <button type="button" class="mic mic-search stt-only" id="cmdk-voice" title="Speak a command (Alt+M)" aria-label="Speak a command"></button>
+  </div>
+  <div class="tabs" role="tablist">
+    <button data-tab="projects" class="on">Projects</button>
+    <button data-tab="timeline">Timeline</button>
+    <button data-tab="media">Media</button>
+    <button data-tab="runs" class="live-only">Runs <span id="runcount" class="n"></span></button>
+  </div>
+  <div id="authbar" class="live-only" hidden></div>
+  <nav id="nav"></nav>
+  <div class="foot"><span id="mode-note"><b>j</b>/<b>k</b> next/prev session</span><a href="#/index.html" data-go="index.html">Home</a></div>
+</aside>
+<main>
+  <header>
+    <button class="btn" id="menu" aria-label="Menu"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+    <div class="title"><span class="kind" id="kind">home</span><b id="ttl">Home</b></div>
+    <div id="actions"></div>
+    <button class="btn" id="prev" title="Previous session (k)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3L5 8l5 5"/></svg><span class="hide-sm">Older</span></button>
+    <button class="btn" id="next" title="Next session (j)"><span class="hide-sm">Newer</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3l5 5-5 5"/></svg></button>
+    <a class="btn" id="open" target="_blank" title="Open this page on its own"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 2h5v5M14 2L7 9M12 9v4a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1h4"/></svg><span class="hide-sm">Open</span></a>
+  </header>
+  <div class="view">
+    <iframe id="frame" title="Devlog page"></iframe>
+    <div id="gallery"></div>
+    <div id="runview"></div>
+  </div>
+</main>
+<dialog id="rundlg">
+  <form method="dialog" id="runform">
+    <h2 id="rd-title">Run in Claude</h2>
+    <p class="rd-sub" id="rd-sub"></p>
+    <div class="warnbox" id="rd-auth" hidden>Claude Code is not logged in on this PC, so a session cannot start yet.
+      <button type="button" class="btn" data-login="1">Log in to Claude Code</button></div>
+    <div class="fieldhead"><label class="lbl" for="rd-prompt">Prompt</label>
+      <button type="button" class="mic stt-only" data-mic="#rd-prompt" title="Dictate (Alt+M): click, speak, click again" aria-label="Dictate the prompt"></button></div>
+    <textarea id="rd-prompt" rows="14" spellcheck="false"></textarea>
+    <div class="rd-row">
+      <fieldset>
+        <legend>Where it runs</legend>
+        <label><input type="radio" name="mode" value="terminal" checked> Terminal window <span class="hint">you watch it and answer its questions</span></label>
+        <label><input type="radio" name="mode" value="background"> Background <span class="hint">runs on its own; follow it under Runs</span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Permissions</legend>
+        <select id="rd-perm"></select>
+        <span class="hint" id="rd-perm-hint"></span>
+      </fieldset>
+    </div>
+    <label class="chk" id="rd-rc-row"><input type="checkbox" id="rd-rc"> Remote Control: also follow it from the Claude app or your phone</label>
+    <label class="chk" id="rd-mark-row"><input type="checkbox" id="rd-mark" checked> Mark the feature in progress</label>
+    <div class="rd-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" id="rd-go" value="go">▶ Start session</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="notedlg">
+  <form method="dialog" id="noteform">
+    <h2 id="nd-title">Note</h2>
+    <p class="rd-sub" id="nd-sub"></p>
+    <fieldset id="nd-target">
+      <legend>Save it as</legend>
+      <label id="nd-t-feature"><input type="radio" name="target" value="feature" checked> A note on this feature <span class="hint">added to the Notes section of its feature file</span></label>
+      <label><input type="radio" name="target" value="ideation"> A new ideation doc <span class="hint">its own page under the project's ideation</span></label>
+    </fieldset>
+    <input id="nd-name" type="text" placeholder="Title (optional; taken from the first sentence)" autocomplete="off">
+    <div class="fieldhead"><label class="lbl" for="nd-text">Note</label>
+      <button type="button" class="mic stt-only" data-mic="#nd-text" title="Dictate (Alt+M): click, speak, click again" aria-label="Dictate the note"></button></div>
+    <textarea id="nd-text" rows="7" placeholder="Speak or type"></textarea>
+    <div class="rd-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" id="nd-go" value="go">Save note</button>
+    </div>
+  </form>
+</dialog>
+<div id="pal" hidden>
+  <div class="pal-box" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="pal-top">
+      <span id="pal-crumb"></span>
+      <input id="pal-q" autocomplete="off" spellcheck="false" aria-label="Command or search" aria-controls="pal-list">
+      <button type="button" class="mic stt-only" data-mic="#pal-q" title="Speak a command (Alt+M)" aria-label="Speak a command"></button>
+    </div>
+    <div id="pal-list" role="listbox"></div>
+    <div class="pal-foot"><span>↑↓ choose · Enter run · Tab fill in · Esc back</span><span class="stt-only">Alt+M speak</span><span>Ctrl+K anywhere</span></div>
+  </div>
+</div>
+<dialog id="descdlg">
+  <form method="dialog" id="descform">
+    <h2 id="ds-title">Describe</h2>
+    <p class="rd-sub" id="ds-sub">What it is, in a sentence and then in detail. Speak or type; this goes into the feature file.</p>
+    <div class="fieldhead"><label class="lbl" for="ds-summary">Summary: one sentence on what it does for the player or for you</label>
+      <button type="button" class="mic stt-only" data-mic="#ds-summary" title="Dictate (Alt+M)" aria-label="Dictate the summary"></button></div>
+    <input id="ds-summary" type="text" autocomplete="off">
+    <div class="fieldhead"><label class="lbl" for="ds-what">What it is: scope, behaviour, what done looks like</label>
+      <button type="button" class="mic stt-only" data-mic="#ds-what" title="Dictate (Alt+M)" aria-label="Dictate the description"></button></div>
+    <textarea id="ds-what" rows="11"></textarea>
+    <div class="rd-actions">
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn live-only" value="claude" title="Open a Claude session that interviews you and writes the description">Work it out with Claude…</button>
+      <button class="btn primary" id="ds-go" value="go">Save description</button>
+    </div>
+  </form>
+</dialog>
+<div id="ctx" role="menu"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+let DATA = {"generated": "2026-10-13T08:31:53Z", "projects": [{"name": "Workspace", "dir": "D:\\Game Dev"}, {"name": "Extraction Game", "dir": "D:\\Game Dev\\Extraction Game"}, {"name": "Forge", "dir": "D:\\Game Dev\\Forge"}], "pages": [{"kind": "home", "title": "Home", "href": "index.html", "search": "home"}, {"kind": "project", "project": "Workspace", "title": "Workspace", "href": "workspace.html", "summary": "The shared side of `D:\\Game Dev`: the two-PC asset pipeline (concept to 3D to export), ComfyUI and its MCP, machine setup scripts, the engines, and the conventions that apply to every project, including this devlog framework.", "next_steps": ["Jon: log the CLI in, then launch a real session on a planned slice (e.g. Forge slice 4) and check its run links to its devlog entry.", "First live check of the Stop hook happens in the next working session."], "search": "workspace the shared side of `d:\\game dev`: the two-pc asset pipeline (concept to 3d to export), comfyui and its mcp, machine setup scripts, the engines, and the conventions that apply to every project, including this devlog framework."}, {"kind": "feature", "project": "Workspace", "title": "Devlog framework", "slug": "devlog", "href": "workspace.html#f-devlog", "status": "done", "own_status": "done", "summary": "Every Claude session in every project leaves an HTML report for Jon and markdown/JSON memory for the next agent; a Stop hook makes it mandatory.", "parent": "", "rollup": "", "group": false, "search": "workspace devlog  ---\nstatus: done\nsummary: every claude session in every project leaves an html report for jon and markdown/json memory for the next agent; a stop hook makes it mandatory.\nstarted: 2026-10-13\n---\n# devlog framework\n\n## what it is\n\na documentation framework for two readers. **humans** get one html page per session (the prompt verbatim, decisions with reasons and alternatives, the development timeline with screenshots and video, tests, commits, later messages), a page per project (features with their build history and media, sessions, handoff, plans) and a home page across projects. **agents** get per-project markdown memory: overview, handoff, one file per feature, ideation and planning folders, a generated commit-by-commit worklog, and a top-level guide (`devlog/guide.md`) on how to read it all.\n\n## current state\n\nworking across workspace, forge and extraction game, and any other folder that gets a `devlog/`. with `start-devlog.bat` the browser is a dev tool: set feature status, launch claude sessions per feature or group (terminal or background), resume logged sessions, follow runs live. launching needs a one-time `claude auth login` on this pc (not done yet). forge is backfilled (overview, handoff, 10 feature files for slices 0 to 9, the slice 3 session from its transcript). `devlog/browse.html` is the entry point for humans: a dark sidebar browser over every page. screenshots and video work: ffmpeg 9.0.2 (winget) and playwright's ffmpeg are installed.\n\n## design decisions\n\n- 2026-10-13: `session.json` and markdown are the source of truth; html and worklog.md are generated by `devlog.py render`. why: agents edit structured data reliably, and pages can be restyled without touching history.\n- 2026-10-13: the prompt, later messages, askuserquestion answers, model, times, files changed and commits are extracted from the claude code transcript and git, never typed by the agent. why: the user asked for the actual prompt; reconstruction drifts.\n- 2026-10-13: enforcement through a user-level stop hook (`devlog.py hook`) that blocks the first stop of a session that edited workspace files without an up-to-date log (once per stop, `stop_hook_active` prevents loops; `devlog.py skip` opts out). why: a claude.md rule alone is easy to forget at the end of a long session; a project-level hook would not fire when a session starts inside `forge\\`.\n- 2026-10-13: skill lives in `d:\\game dev\\.claude\\skills\\devlog` with a directory junction from `%userprofile%\\.claude\\skills\\devlog`, so it loads whether a session starts in `d:\\game dev`, `forge` or a game folder; rules in `d:\\game dev\\claude.md`, which claude code loads from parent folders.\n- 2026-10-13: feature memory lives in the repos (`devlog/features/*.md`), not in claude's per-user memory folder. why: it travels with the project and is visible to any agent and to jon.\n- 2026-10-13: python standard library only for `devlog.py`; playwright (`playwright-core` from forge's `ui/node_modules`, installed edge) for web captures; powershell + .net for window screenshots; ffmpeg gdigrab for video.\n\n- 2026-10-13: `browse.html` is raw html/css/js generated by `render` with the page manifest embedded, because `file://` pages cannot list folders or fetch. framed pages post their address (and the j/k// keys) to the browser with postmessage, since `file://` frames are cross-origin.\n- 2026-10-13: dark by default everywhere; light only behind `data-theme=light`. jon's standing preference for all designs.\n- 2026-10-13: projects are discovered by searching for `devlog/` up to 4 levels below `d:\\game dev`, skipping `skip_dirs` (engines, comfyui, build output, dependencies, engine caches). nested projects are named by path. jon asked for every project with a devlog to show.\n\n- 2026-10-13: features group through front matter (`parent: <slug>`, `order: <n>`), not folders, so existing links to `features/<slug>.md` keep working and regrouping is a one-line change (`devlog.py feature ... --parent`). a group is an ordinary feature file with its own notes; its status rolls up from its members unless set. groups nest. jon asked to group slices under features.\n\n- 2026-10-13: the browser became a dev tool through a local server (`devlog_server.py`, stdlib, 127.0.0.1:8765), because a `file://` page cannot write files or start processes. static mode still works read-only. security: host must be 127.0.0.1/localhost (no dns rebinding), every `/api` call needs a random per-start token written into the served page (no csrf), origin checked, static files only under the workspace, no dot-folders, extension allowlist. `bypasspermissions` is not offered.\n- 2026-10-13: sessions launch with the claude code cli bundled in the desktop app (`%appdata%\\claude\\claude-code\\<ver>\\...\\claude.exe`; `devlog_claude` overrides). terminal mode: a new console running `devlog.py launch <run>`, which runs claude with a pre-assigned `--session-id` and records the exit. background mode: `claude --bg`, which ignores `--session-id`, so the server reads the short id from its output and adopts the real id from `claude agents --json`. status comes from `agents --json` (busy = working, idle/blocked = waiting).\n- 2026-10-13: runs are recorded in `devlog/runs/<id>.json`; `devlog.py start` links a session log to its run by session id (environment variables do not reach `--bg` sessions).\n\n- 2026-10-13: dictation uses local whisper (faster-whisper, large-v3-turbo, float16 on the rtx 5080, int8 cpu fallback), chosen by jon over browser speech recognition: private, offline, better on technical words. the browser records opus with mediarecorder and posts it to `/api/transcribe`. the model loads when a mic is pressed and unloads after 5 idle minutes so comfyui gets the vram back. 13 s of speech: 0.2 s warm, about 2 s from cold.\n- 2026-10-13: whisper gets a vocabulary hint built from project and feature names, with slice numbers and version tags stripped: with them it inserted \"slice 4.0.3\" into speech that never said it.\n- 2026-10-13: voice (or typed) notes go to a feature file's `## notes` section or a new `ideation/<date>-<title>.md`, labelled \"voice note\" when dictated, so the devlog keeps ideas in jon's words.\n\n- 2026-10-13: the sidebar search became a command palette (ctrl+k, `/`, typing anywhere, or alt+m to speak): one box to search every page and run every action, with context actions for the page you are on, the project's handoff next steps, and step-by-step command templates for anything left unsaid. jon asked for a palette that navigates, starts ideation, starts feature descriptions and triggers things, by voice too.\n- 2026-10-13: spoken and typed phrases go through a local intent parser (regex intents plus fuzzy name matching, \"slice four\" = slice 4, bare names, slugs), not claude: instant, works without the cli login, and predictable. anything it cannot place is offered as \"ask claude: …\" or \"capture as an idea\". after speech, only navigation whose names all resolved runs by itself; anything that changes files waits for enter.\n- 2026-10-13: new palette verbs on the server: create a feature (then the describe dialog opens), read and write a feature's summary and \"what it is\", move a feature between groups (no cycles), open a project in explorer or vs code, and prompts for brainstorm, describe and plan sessions (conversations default to a terminal window).\n\n## key files\n\n- `.claude/skills/devlog/skill.md` (procedure), `reference/session-schema.md`, `reference/capture.md`\n- `.claude/skills/devlog/scripts/devlog.py` (init, start, media, feature, render, where, skip, hook), `capture.ps1`, `record.ps1`, `capture_web.mjs`, `_win.ps1`\n- `.claude/skills/devlog/templates/` (stamped by `init` and `feature`); `templates/browse.html` is the browser, `devlog.py` `css` styles every other page\n- `devlog.py` `projects()` / `skip_dirs` / `project_depth`: project discovery\n- `devlog.py` `feature_tree()`, `rollup_text()`, `set_front_matter()`: feature groups\n- `scripts/devlog_server.py`: server, api (`/api/state`, `/api/feature/status`, `/api/run`, `/api/resume`, `/api/runs/<id>/activity|stop|attach`, `/api/login`, `/api/render`), launcher, run tracking; `start-devlog.bat` in the workspace root\n- `devlog/runs/*.json`: launch records\n- `templates/browse.html`: palette (`intents()` parser, `tpl` command templates, `contextactions()`, `stepchoices()`, `examples`), describe dialog; server `new_feature()`, `get/set_description()`, `set_parent()`, `open_in()`, `session_prompt()`; `devlog.py handoff_next_steps()`\n- `scripts/devlog_stt.py`: local whisper (`python devlog_stt.py <audio>` to try it); server `/api/transcribe`, `/api/stt/warm`, `/api/note`, `vocabulary()`, `add_note()`\n- `claude.md`, `devlog/guide.md`, `%userprofile%\\.claude\\settings.json` (stop hook)\n\n## gotchas\n\n- sessions that write files through bash or powershell do not show edit-tool calls; `render` also adds uncommitted files whose modification time falls inside the session. the hook's \"did work\" test only sees edit tools, file-history entries and `git commit`, so a shell-only session may not be prompted.\n- session duration is first to last message, including idle gaps (the slice 3 session shows ~9 h across a usage-limit pause).\n- the workspace project's page is `devlog/workspace.html`; `devlog/index.html` there is the cross-project home.\n- the in-app browser and computer-use screenshot tools do not write files; use the capture scripts for devlog media.\n- the in-app browser pane shows `file://` pages as static snapshots without scripts: test `browse.html` in edge through playwright (`capture_web.mjs`, or a short playwright-core script).\n- page scripts cannot reach into `file://` frames; in capture steps scroll framed pages with `{\"wheel\":[x,y,dy]}`, not `eval`.\n- `browse.html` is a snapshot: a devlog created by hand appears after the next `devlog.py render`.\n- the cli the server launches has its own login: until `claude auth login` is done once on this pc, sessions answer \"not logged in\". the browser shows a banner and a button that opens a terminal for the user to sign in; runs that hit it are marked failed.\n- adding a palette phrase: add a branch to `intents()` (and a `tpl` entry if it should be browsable, and an `examples` line), then run the phrase list in a playwright check. order regex alternations longest-first (\"ideation|ideas|idea\"): \"idea\" matched inside \"ideation\" once and produced the topic \"tion\".\n- faster-whisper 1.2.1 breaks with pyav 19 (`open() got an unexpected keyword argument 'metadata_errors'`); pyav 16.0.1 works. keep that pin when upgrading. whisper's python packages live in the user site of python 3.12 (`pip install --user faster-whisper nvidia-cublas-cu12 \"nvidia-cudnn-cu12==9.*\" av==16.0.1`).\n- the server loads `devlog.py` once: restart it after changing `devlog.py`, `devlog_server.py` (templates are read per render).\n- writing windows paths through shell heredocs into python strings turned `\\b` and `\\06` into control characters. use the write/edit tools or a script file for text with backslashes.\n\n## open questions\n\n- publish session pages as private claude.ai artifacts for viewing away from the pc?\n- re-render on session start so hand-made devlogs show up without a render?\n\n## history\n\n- 2026-10-13 [devlog framework and browser](../sessions/2026-10-13-devlog-framework/index.html): built the framework, seeded forge and extraction game, installed ffmpeg, built the dark browser with deep project discovery.\n"}, {"kind": "session", "project": "Workspace", "title": "Devlog framework, browser, dev tool, dictation and command palette", "href": "sessions/2026-10-13-devlog-framework/index.html", "started": "2026-10-13T07:05:28.235Z", "outcome": "done", "summary": "Set up a documentation framework for every project in `D:\\Game Dev`: a `devlog` skill that turns each Claude session into an HTML report and keeps per-project agent memory, enforced by a Stop hook. Then built `devlog/browse.html` (dark, every project, feature groups), made it a dev tool…", "features": ["devlog"], "media": [{"src": "sessions/2026-10-13-devlog-framework/media/palette-context.png", "caption": "The command palette on a feature page: actions for this feature, ideation in its project, and the project's next steps from its handoff.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/palette-voice.png", "caption": "A spoken \"Mark slice 4 in progress\": understood and highlighted, waiting for Enter because it changes a file.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/dictation-recording.png", "caption": "Recording a voice note on Forge slice 8: the mic turns red with a level ring and a timer.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/dictation-note.png", "caption": "The transcription in the note, ready to save into the feature file or a new ideation doc (taken before the vocabulary fix removed the stray \"Slice 4.0.3\").", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/dev-tool-dialog.png", "caption": "Launching a Claude session on Forge slice 4 from the browser: generated prompt, terminal or background, permissions; Start stays disabled until the CLI is logged in.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/dev-tool-runs.png", "caption": "The Runs tab: a launched session with its state, recent activity from the transcript, prompt and ids.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/browser-tour.mp4", "caption": "Tour of `browse.html`: home, a session, a feature's build history, the timeline, the media gallery, and a search for \"fp8\".", "feature": "devlog", "kind": "video"}, {"src": "sessions/2026-10-13-devlog-framework/media/browser.png", "caption": "The browser: every project with a devlog in the sidebar, sessions and features with status dots, the page on the right.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/feature-groups-browser.png", "caption": "Feature groups in the browser: Generation engine (2/4 done) open on slice 3, with the group's member sections on the right.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/feature-groups-page.png", "caption": "Forge's project page with slices grouped under three features; Voice stands alone.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/session-page.png", "caption": "A session page (Forge slice 3, backfilled): prompt, decisions with who made them, and the build timeline.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/forge-project-page.png", "caption": "Forge's project page: feature cards by status, then each feature's build history.", "feature": "devlog", "kind": "image"}, {"src": "sessions/2026-10-13-devlog-framework/media/home-page.png", "caption": "The cross-project home page, `devlog/index.html`.", "feature": "devlog", "kind": "image"}], "session_ids": ["2dded1a2-c2d6-4eb1-b233-98c204e1f683"], "cwd": "D:\\Game Dev", "run": "", "search": "workspace devlog framework, browser, dev tool, dictation and command palette set up a documentation framework for every project in `d:\\game dev`: a `devlog` skill that turns each claude session into an html report and keeps per-project agent memory, enforced by a stop hook. then built `devlog/browse.html` (dark, every project, feature groups), made it a dev tool (`start-devlog.bat`: status, launching and following claude sessions), added local whisper dictation, and replaced the search box with a command palette that does everything by typing or by voice. setup claude skills and rules to use them. \n\n1. documentation framework that needs to serve both humans that are reviewing the work that has been done, , and claude itself. \n\n\nfor human review, for each session, you should generate an html page that documents the prompt that was used to start this work, decisions that were made along the way, about what to do, take screenshots and videos of new features as they are added, uh, and document as well as you can the development process of each feature.\n\n for the agent itself, you should set up a framework to store memories of what was worked on, for each feature, and a top-level document guiding the ai in how to um, review this corpus of information about the process. there should be the initial ideation documents, planning documents, overview documents, uh, a nd then like a documentation of work as it progresses, commit by commit, that's handed off to agents.\n\nthis skill should always be used at agents at the end of their work. this applies to sub-projects within game dev, such as forge or any games that are worked on. devlog where do the logs and memory live? a `devlog/` folder inside each project (workspace, forge, extraction game), same shape everywhere, plus a cross-project home page. travels with each repo, readable by any agent and by jon; claude's per-user memory folder is invisible to both. what is the source of truth? `session.json` and markdown; html pages and `worklog.md` are generated by `devlog.py render`. agents edit structured data reliably; pages can change style without rewriting history; the worklog can be rebuilt commit by commit. how is the prompt captured? extracted verbatim from the claude code transcript (`~/.claude/projects/*/<session>.jsonl`), along with later messages, askuserquestion answers, model, times and edited files; commits from `git log`. the user asked for the prompt that started the work; an agent's recollection drifts, especially after context compaction. how is \"always at the end of their work\" enforced? a stop hook in the user settings that blocks the first stop of a session that edited workspace files without an up-to-date log, plus the rule in `d:\\game dev\\claude.md`. a rule alone is easy to skip at the end of a long session. user-level so it also fires for sessions started inside `forge\\` or a game folder; it does nothing outside `d:\\game dev`, and `devlog.py skip` is the escape hatch. how are screenshots and video taken? scripts that write files: `capture.ps1` (any window, .net), `record.ps1` (ffmpeg gdigrab, also converts godot/playwright clips), `capture_web.mjs` (playwright with installed edge, scripted steps, video, or attach over cdp to the real webview2). the built-in screenshot tools return images to the agent but save nothing. backfill forge? yes: overview, handoff, a feature file per slice (0 to 3 detailed from the docs and perf log, 4 to 9 as planned stubs), and a session log for slice 3 built from its transcript. an empty corpus gives the next agent nothing; forge already had plans, a perf log and a transcript to draw on. the backfilled session is marked as such. install ffmpeg now? installed on request: ffmpeg 9.0.2 via winget (`gyan.ffmpeg`) and playwright's ffmpeg build. window recording (`record.ps1`) and web-page video (`capture_web.mjs --video`) both need it. how does the browser know which pages exist? `devlog.py render` writes `devlog/browse.html` with a manifest of every project, session, feature and media file embedded as json. pages open from `file://`, where a page cannot list folders or fetch files. raw html/css/js, no build step or framework, as asked. how does the sidebar follow links clicked inside a page? every generated page posts its address to the parent window when it is framed; the browser maps it back to the manifest and updates the address and the highlight. browsers treat `file://` frames as cross-origin, so the parent cannot read the frame's location. postmessage works across that boundary. the same channel forwards the j, k and / shortcuts pressed while the page has focus. light or dark? dark by default on every page; light only behind an explicit `data-theme=light`. saved as a standing preference for all future designs. \"make it dark mode. always default to dark mode designs\" which projects does the browser show? every folder under `d:\\game dev` that has a `devlog/`, searched up to 4 levels deep, skipping engine installs, comfyui, build output, dependencies and engine caches. nested projects are named by path (`games/foo`). \"the main browser needs to show the devlogs for all projects in the game dev folder if a devlog exists\". the scan takes ~0.1 s. how are features grouped (e.g. several slices under one feature)? front matter in the feature file: `parent: <slug>` names the group feature, `order: <n>` sorts siblings. a group is an ordinary feature file; its status and \"2/4 done\" roll up from its members. groups nest. links to `features/<slug>.md` from sessions, worklog and other features keep working, and regrouping is one line (`devlog.py feature ... --parent`). a group keeps its own notes and decisions. how to group forge's ten slices? generation engine (slices 0, 2, 3, 9), 3d models and export (1, 7), asset stages: map to asset images (4, 5, 6); voice (8) stays on its own. follows what each slice builds rather than release order: shared crates and shared budgets. easy to change with `--parent`. how can the browser change status and start claude? a local server, `devlog_server.py` (python standard library), started by `start-devlog.bat`, serving the same pages plus an api. the `file://` version stays as a read-only fallback. a page opened from disk cannot write files or start processes. how is the server kept safe? 127.0.0.1 only; host header must be 127.0.0.1/localhost; a random token per server start, written into the served page, required on every api call; origin checked; static files limited to the workspace, no dot-folders, an extension allowlist; `bypasspermissions` never offered. it can start claude sessions, so other websites (csrf, dns rebinding) and other files must not be able to drive or read it. how are sessions launched? the claude code cli bundled with the desktop app. terminal mode opens a console that runs the session with a pre-assigned session id and records how it ended; background mode uses `claude --bg`. status for both comes from `claude agents --json`. no standalone `claude` on path; the bundled one is the same claude code and has `--bg`, `agents`, `attach`, `stop`. log the cli in from the tool? no: the tool shows a banner and opens `claude auth login` in a terminal; the user signs in there. signing in is the user's to do; the server never handles credentials. which speech-to-text engine, and where can you dictate? local whisper (faster-whisper, large-v3-turbo) on this pc; dictation in launch prompts, the search box, and voice notes saved into the devlog. private and offline, better with code and game terms, and the rtx 5080 makes it near-instant. how should spoken commands be understood? a local intent parser in the page: phrase patterns plus fuzzy name matching (\"slice four\", bare names, slugs), with anything unplaced offered as \"ask claude\" or \"capture as an idea\". instant, works offline and without the cli login, and predictable about what it will do. what may a spoken command do without confirmation? only navigation where every name was understood runs by itself; anything that changes files or starts a session is highlighted and waits for enter. a mis-heard command should never change the devlog or launch claude. a test where whisper heard the phrase twice auto-navigated to the wrong project before this rule. surveyed the workspace: forge (rust/tauri + react, slices 0 to 3, plans in `docs/`), an empty extraction game repo, pipeline and setup. no existing claude.md, skills or user settings. transcripts carry `origin.kind = human` on the user's own messages, `custom-title`, `file-history-delta` entries and the model id, which is enough to extract the prompt and follow-ups exactly. wrote `devlog.py` (stdlib only): init, start, media, feature, render, where, skip, hook; a small markdown renderer; session, project and home pages; worklog generation. the workspace project's page and the cross-project home both wanted `devlog/index.html`. the workspace project's page became `devlog/workspace.html`; all links are computed with relative paths. wrote the skill (`skill.md`, session schema, capture recipes for forge, godot, unreal), templates, `devlog/guide.md` and the root `claude.md`; linked the skill into the user skills folder with a junction; added the stop hook. hook checked against three real transcripts: blocks a session with edits and no log, allows with `stop_hook_active`, allows outside the workspace. the slice 3 session wrote most files through bash, so only 22 of 57 changed files were detected. `render` now also adds uncommitted files modified during the session window (57 detected). backfilled forge and rendered the slice 3 session page. project page: features ordered in progress, done, planned; features with no sessions collapsed; relative links in inlined plans fixed; feature titles prefixed with their slice number. logged this session with the skill itself. installed ffmpeg (winget) and playwright's ffmpeg. verified a 3 s h.264 window recording, a web-page video, and webm to mp4 conversion. built `browse.html`: sidebar with projects (sessions and features per project), a timeline tab, a media gallery with filters, full-text search over titles, summaries, prompts, decisions and timelines, older/newer buttons and j/k keys, deep links (`browse.html#/<page>`), and a mobile layout. each page got a \"browse all\" link back into it. the in-app browser pane shows `file://` pages as static snapshots without scripts, so it could not test the browser. tested in real edge through playwright instead: navigation, links inside pages, search, deep links, mobile width, no console errors. j/k did nothing after clicking inside a page: the keystrokes went to the framed page. framed pages forward j, k and / to the browser. switched every page and the browser to dark by default, at your request. summaries on index pages were cut mid-word (\"*backfil\"); they now end at a word boundary without a dangling emphasis marker. project discovery now searches every folder up to 4 levels deep. tested with a temporary nested project and a bare `devlog/` folder: both appeared in the sidebar and opened, then were deleted. scripting a scroll inside a framed `file://` page is blocked (cross-origin). added a `wheel` step to `capture_web.mjs` that scrolls whatever is under the mouse, frames included, and recorded a tour of the browser. added feature groups: `feature_tree()` nests features by `parent:`, sorts by `order:`, rolls status up, and ignores unknown parents and cycles. `devlog.py feature` gained `--parent` and `--order` (also regroups existing files). project page: group cards list their members with status and progress; the build history shows each group's sessions labelled by member, with each member collapsible below. links to a member open its section. browser sidebar: groups are collapsible nodes showing \"n/m done\"; a chevron toggles, the name opens the group, and opening a member expands its group. grouped forge's slices under three new group features. no `claude` on path, but the desktop app bundles claude code 2.1.295 with `--session-id`, `--bg`, `agents --json`, `attach`, `logs`, `stop`, `--permission-mode` and `--remote-control`. wrote `devlog_server.py`: static serving with range requests, `/api/state`, feature status, run/resume, run activity from the transcript, stop/attach, login, render. `devlog.py serve` and `start-devlog.bat` start it. security probes: no token 403, foreign host 421, cross-origin post 403, traversal 403, dot-folders and scripts 403; pages, docs and video (206) served. browser: header status dropdown and ▶ run in claude on features, resume on sessions, new session on projects; right-click menu on sidebar features; a launch dialog with an editable generated prompt, terminal or background, permission mode, remote control, mark in progress; a runs tab with live state and recent activity. changed voice and slice 4 status through the dropdown and the right-click menu: files, sidebar, group rollup and the framed page all updated; restored both. a background test launch answered \"not logged in\", and `--bg` ignored the pre-assigned session id. the server now reads the real session id from `--bg` output and `agents --json`, reports `claude auth status`, shows a login banner with a button that opens `claude auth login`, disables start while logged out, and marks runs that hit it as failed with an explanation. terminal launch on forge voice opened a windows terminal window titled with the feature in the forge folder; stop closed it. background launch resolved its session, showed its activity, and stopped. test run records removed afterwards. installed faster-whisper with nvidia cublas/cudnn wheels; ctranslate2 sees the rtx 5080. wrote `devlog_stt.py` (lazy load, gpu with cpu fallback, idle unload, vocabulary hint). faster-whisper 1.2.1 failed with pyav 19 (`metadata_errors`). pinned pyav 16.0.1. first run downloaded the model (~21 s); warm, 13 s of speech transcribes in 0.24 s on the gpu. server: `/api/transcribe` (raw audio), `/api/stt/warm`, `/api/note`. browser: mic buttons with a level ring and timer on the launch prompt, search and the note dialog; alt+m toggles, esc discards; a note/idea button on features and projects that opens straight into recording; \"add a note…\" in the right-click menu. edge with a fake microphone playing a windows tts clip: a voice note saved into `voice.md`, the launch prompt dictated with alt+m, and the search box dictated; no errors. test edits reverted. whisper wrote \"map stage, slice 4.0.3\": the vocabulary hint contained full feature names with slice numbers and version tags. the hint now keeps only the distinctive words of feature names; three repeat runs came back word-perfect in 0.22 s. server: create a feature, read and write its description, move it between groups, open a project in explorer or vs code, prompts for brainstorm, describe and plan sessions; handoff next steps in the manifest. browser: the sidebar search became the palette (ctrl+k, `/`, start typing, or alt+m to speak). empty, it shows actions for the current page, the project's next steps and every command; typed or spoken, it shows best matches, matching commands, pages that mention the words, and ask claude / capture as idea. describe dialog for a feature's summary and \"what it is\", with mics and a \"work it out with claude\" button; creating a feature opens it straight away. 27 example phrases checked: 26 right first time; \"start ideation\" produced the topic \"tion\". regex alternatives ordered longest first with word boundaries; duplicate ask claude fallback removed. end to end in edge: created a feature and saved its description, set statuses by phrase and through the step-by-step flow, moved and ungrouped a feature, opened a brainstorm prompt. all changes reverted. spoken \"go to the forge handoff\" (heard twice because the test recorded past the clip) fell back to the alphabetically first project and navigated there by itself. auto-run only when every name resolved; the fallback project is now the one worked on most recently. re-run: navigation went to forge's handoff; \"mark slice 4 in progress\" waited for enter."}, {"kind": "project", "project": "Extraction Game", "title": "Extraction Game", "href": "../Extraction%20Game/devlog/index.html", "summary": "An extraction game, not started yet: the folder is an empty Git repository with LFS configured by `Setup\\Setup-Workstation.ps1`, waiting for its first ideation and engine choice.", "next_steps": ["Ideation: capture the game idea in Jon's words in ideation/ (genre, core loop, setting, scope, references).", "Choose the engine (Godot 4.7 .NET or Unreal 5.8) and record the decision with reasons in planning/.", "A first plan with milestones in planning/, and a feature file per first feature."], "search": "extraction game an extraction game, not started yet: the folder is an empty git repository with lfs configured by `setup\\setup-workstation.ps1`, waiting for its first ideation and engine choice."}, {"kind": "project", "project": "Forge", "title": "Forge", "href": "../Forge/devlog/index.html", "summary": "Forge is a Windows desktop app that drives ComfyUI on both of Jon's PCs (RTX 5080 workstation, RTX 4080 Super generation node) as a small render farm and turns prompts into game assets: map, concept art, isolated asset images, then textured, game-ready 3D models, with voice prompts later. It is…", "next_steps": ["Jon: decide on an fp8 Klein + text encoder that fit in 16 GB (the node already has flux-2-klein-4b-fp8.safetensors, the workstation does not); then re-run npm run fanout and npm run gates.", "Rebuild Forge, use it, then npm run gates -- --since-unix-ms <start> to get the in-app first-open number.", "Manual check: pull the node's network cable mid-round, then plug it back; record in docs/perf-log.md.", "Commit slice 3 when Jon asks.", "Slice 4 (Map stage) per the MVP plan."], "search": "forge forge is a windows desktop app that drives comfyui on both of jon's pcs (rtx 5080 workstation, rtx 4080 super generation node) as a small render farm and turns prompts into game assets: map, concept art, isolated asset images, then textured, game-ready 3d models, with voice prompts later. it is built in thin vertical slices, each ending in a demo and a measured performance gate."}, {"kind": "feature", "project": "Forge", "title": "Generation engine", "slug": "generation-engine", "href": "../Forge/devlog/index.html#f-generation-engine", "status": "in-progress", "own_status": "", "summary": "The machinery under every stage: jobs from prompt to screen, the 4-option loop, both GPUs as a render farm, and the reliability work for daily use.", "parent": "", "rollup": "2/4 done · 1 in-progress, 1 planned", "group": true, "search": "forge generation-engine  ---\nsummary: the machinery under every stage: jobs from prompt to screen, the 4-option loop, both gpus as a render farm, and the reliability work for daily use.\norder: 1\n---\n# generation engine\n\n<!-- group feature: status is rolled up from the features under it (parent: generation-engine). -->\n\n## what it is\n\neverything that turns a request into finished outputs quickly and reliably, independent of which stage asked: the job path and its timing (slice 0), the options loop every stage reuses (slice 2), scheduling across the 5080 and the 4080 super (slice 3), and crash recovery, settings and first-run checks (slice 9).\n\n## current state\n\nslices 0 and 2 done; slice 3 implemented but uncommitted with two gpu-bound gate misses; slice 9 planned. see each sub-feature.\n\n## design decisions\n\n- 2026-10-13: grouped as one feature because all four share the same budget (forge overhead per job) and the same crates (`forge-core`, `forge-sched`, `forge-comfy`, `forge-supervisor`).\n\n## key files\n\n- `crates/forge-core`, `crates/forge-sched`, `crates/forge-comfy`, `crates/forge-supervisor`, `crates/forge-store`, `crates/forge-perf`\n\n## history\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 0: Job path (walking skeleton)", "slug": "job-path", "href": "../Forge/devlog/index.html#f-job-path", "status": "done", "own_status": "done", "summary": "The tracer-bullet path every job takes: prompt to ComfyUI to SQLite and disk to the screen, with timing at every hop.", "parent": "generation-engine", "rollup": "", "group": false, "search": "forge job-path generation engine ---\nstatus: done\nsummary: the tracer-bullet path every job takes: prompt to comfyui to sqlite and disk to the screen, with timing at every hop.\nstarted: 2026-10-11\nparent: generation-engine\norder: 0\n---\n# slice 0: job path (walking skeleton)\n\n## what it is\n\nslice 0 of the mvp plan. launch `forge.exe`, type a prompt, one image appears, through the real supervisor, comfyui client, project store and `forge://` protocol. every later slice widens this path instead of building layers in isolation.\n\n## current state\n\ndone and committed (`825152e`). build-time checks passed on a linux ci box with mock comfyui (forge overhead 2 to 9 ms per job, progress coalesced to ≤ 20/s). the release gate run on jon-gaming (window visible < 1 s, overhead p95, ui p99 frame, orphan check) has an empty table in `docs/perf-log.md`; later gate runs cover overhead (p95 282 ms with two gpus).\n\n## design decisions\n\n- 2026-10-11: supervisor **adopts** a running comfyui and leaves it running on exit; otherwise **launches** it under a windows job object so a crashed forge leaves no orphans. why: jon often has comfyui open already from `start-comfyui.bat`.\n- 2026-10-11: comfyui outputs go to `forge\\comfy-output` when forge launches it, on the same drive as projects, so results are hard-linked, not copied.\n- 2026-10-11: ipc carries ids only (< 64 kb, asserted in dev); bytes go over `forge://`; sqlite (wal, single writer thread) is the source of truth.\n\n## key files\n\n- `crates/forge-supervisor`, `crates/forge-comfy`, `crates/forge-store`, `crates/forge-perf`, `crates/forge-app/src/protocol.rs`, `crates/forge-app/src/engine.rs`\n- `tools/mock-comfy` (gpu-free stand-in)\n\n## gotchas\n\n- the headline metric is forge overhead = job wall time minus comfyui execution time. comfyui-side waits (post-prompt cleanup, a busy node answering slowly) count toward it.\n\n## open questions\n\n## history\n\n- 2026-10-11 slice 0 built (before this devlog existed; see commit `825152e` and `docs/perf-log.md`).\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 2: The options loop", "slug": "options-loop", "href": "../Forge/devlog/index.html#f-options-loop", "status": "done", "own_status": "done", "summary": "Every prompt gives 4 options; pick, vary, regenerate, branch from any earlier pick, and reproduce any option from its stored recipe.", "parent": "generation-engine", "rollup": "", "group": false, "search": "forge options-loop generation engine ---\nstatus: done\nsummary: every prompt gives 4 options; pick, vary, regenerate, branch from any earlier pick, and reproduce any option from its stored recipe.\nstarted: 2026-10-12\nparent: generation-engine\norder: 2\n---\n# slice 2: the options loop\n\n## what it is\n\nthe generic stage loop all later stages reuse. each generation gives 4 draft options (4 steps). picking one queues a final-quality render (20 steps, base model, same seed) in the background. the project tree supports branching from an older pick. every option stores recipe, recipe revision, seed, model and timings; **reproduce from recipe** re-runs and compares.\n\n## current state\n\ndone and committed (`2420860`). build-time checks pass. the workstation gate run (thumbnail < 150 ms, stage switch < 100 ms, 500-thumbnail grid at 60 fps and < 200 mb) has not been filled in `docs/perf-log.md`; the grid bench has never been run in the perf log.\n\n## design decisions\n\n- 2026-10-12: thumbnails generated once in rust (`forge-thumbs`, simd resize, 320 px webp), cached by hash.\n- 2026-10-12: scheduler (`forge-sched`) introduced with one machine but priority classes (foreground, background) already in place, so slice 3 only adds machines.\n\n## key files\n\n- `crates/forge-core` (stage loop), `crates/forge-thumbs`, `crates/forge-sched`, `tools/forge-bench` (`seed-grid` fills a node with 500 options), `docs/demo-slice2.json`\n\n## gotchas\n\n- `fast_image_resize`'s generic code compiles in the calling crate: `forge-thumbs` is optimised in dev builds (`[profile.dev.package.forge-thumbs]`), otherwise resize takes ~300 ms instead of ~6 ms.\n- webkitgtk has no `performance.memory`; the grid bench memory figure only appears in webview2.\n\n## open questions\n\n## history\n\n- 2026-10-12 slice 2 built (before this devlog; commit `2420860`).\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 3: Render farm on both GPUs", "slug": "render-farm", "href": "../Forge/devlog/index.html#f-render-farm", "status": "in-progress", "own_status": "in-progress", "summary": "Jobs fan out across the RTX 5080 and the RTX 4080 Super with model affinity, capability checks and lost-machine fallback; a node agent reports GPU stats.", "parent": "generation-engine", "rollup": "", "group": false, "search": "forge render-farm generation engine ---\nstatus: in-progress\nsummary: jobs fan out across the rtx 5080 and the rtx 4080 super with model affinity, capability checks and lost-machine fallback; a node agent reports gpu stats.\nstarted: 2026-10-12\nparent: generation-engine\norder: 3\n---\n# slice 3: render farm on both gpus\n\n## what it is\n\nthe options loop spread across both pcs. a round of 4 lands 2 on each gpu. each job goes to a machine that already holds its model when that is quicker than loading it elsewhere; a model a machine cannot run (trellis.2 on the 4080) never goes there. if the node drops off the network its jobs rerun on the workstation without an error, and it rejoins by itself. `forge-agent.exe` on the node reports vram, utilisation, comfyui state and loaded models, and can start/stop a comfyui it launched. the **gpus** badge opens a status panel per machine.\n\n## current state\n\nimplemented, tests pass (including `headless_two_gpus.rs` with a simulated pulled cable), **uncommitted**. agent 0.0.1 installed on the node. gates on real hardware (16:35 run, oct 12): reloads 0 (pass), overhead p95 282 ms (pass), two-gpu/one-gpu ratio 0.70 (fail, budget ≤ 0.6), worst-round gpu busy 0.18 (fail, budget > 0.85). still to check by hand: pull the node's cable mid-round, and rejoin.\n\n## design decisions\n\n- 2026-10-12: node agent as a small http service on :8190 with a token (left on the pipeline share at `p:\\_forge\\nodes\\<pc>.json`), firewall open for the private profile and local subnet only. why: comfyui does not expose gpu utilisation or loaded models, and `nvidia-smi` only runs locally. ([session](../sessions/2026-10-12-slice-3-both-gpus/index.html))\n- 2026-10-12: forge and the agent never stop a comfyui they did not start (the node's gennode login task owns it). the agent stops its own comfyui when forge exits or after 5 minutes of silence.\n- 2026-10-12: affinity first, but the other machine loads the model when that beats waiting, which is what spreads a round over both gpus. foreground always ahead of background.\n- 2026-10-12: time lost on a dropped machine is excluded from forge overhead; work forge did not send (e.g. the node's 3d queue watcher) blocks new jobs on that machine until done.\n- 2026-10-13: the gate misses are gpu/model-bound, not forge. recommended fix: an fp8 klein and text encoder that fit in 16 gb together. left to jon (model choice), not changed.\n\n## key files\n\n- `crates/forge-sched/src/lib.rs`, `crates/forge-app/src/machines.rs`, `crates/forge-agent/src/{main,server,client,gpu,proto}.rs`\n- `ui/src/components/machinesbadge.tsx`, `statuspanel.tsx`\n- `tools/forge-bench/src/fanout.rs` (`npm run fanout`), `tools/forge-agent/*.ps1` (`npm run agent:publish`, node installer)\n- `crates/forge-app/tests/headless_two_gpus.rs`, `docs/demo-slice3.json`\n- `settings.json` `remote_machines` (node `gen-node`, comfyui `192.168.1.66:8188`, agent `:8190`)\n\n## gotchas\n\n- every machine running a new prompt loads the 7.7 gb qwen3 text encoder and encodes (~0.5 s on the 5080, ~1.2 s on the 4080), and the 4080 runs drafts ~20% slower: the gpu-bound floor for 2 + 2 short drafts is ~0.69 even with zero overhead.\n- the node has 32 gb ram; when the encoder and the 7.4 gb klein do not both fit in 16 gb vram, comfyui swaps them from system ram and a job can take 5.5 s instead of 3.2 s at ~38% utilisation.\n- overhead outliers come from the node while it is still loading models (a fetch of 1.3 s on its first-ever job). warm rounds are 15 to 70 ms.\n- a prompt submitted right after the previous finished waits ~200 ms for comfyui's post-prompt cleanup; it counts as overhead.\n- lost-machine detection: ~6 s with the agent, ~20 s without.\n\n## open questions\n\n- fp8 klein + text encoder on both machines? (jon's call; the node already has `flux-2-klein-4b-fp8.safetensors`.)\n- queue the next prompt in comfyui before the current one ends to hide the ~200 ms cleanup wait, at the cost of a foreground job sometimes waiting behind one queued prompt?\n\n## history\n\n- 2026-10-12 [slice 3: both gpus](../sessions/2026-10-12-slice-3-both-gpus/index.html): scheduler, agent, status panel, fanout bench and gate runs.\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 9: Ready for daily use (v1.0)", "slug": "daily-use", "href": "../Forge/devlog/index.html#f-daily-use", "status": "planned", "own_status": "planned", "summary": "v1.0: Ollama planner option, crash-safe job recovery, settings and first-run setup, idle CPU < 1%.", "parent": "generation-engine", "rollup": "", "group": false, "search": "forge daily-use generation engine ---\nstatus: planned\nsummary: v1.0: ollama planner option, crash-safe job recovery, settings and first-run setup, idle cpu < 1%.\nparent: generation-engine\norder: 9\n---\n# slice 9: ready for daily use (v1.0)\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\nlocal llm via ollama as a setting; queue rebuilt from sqlite after a crash with in-flight comfyui jobs re-attached; free-gpu-memory command; optional wake-on-lan; settings screen with model slot choices per recipe (where the fp8 klein decision from slice 3 lands); first-run model check on both pcs. done when jon uses it for a week of real asset work.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "feature", "project": "Forge", "title": "3D models and export", "slug": "models-and-export", "href": "../Forge/devlog/index.html#f-models-and-export", "status": "in-progress", "own_status": "", "summary": "From an image to a game-ready 3D model: generate the GLB, view it in the app, then export it with LODs and checks for Godot and Unreal.", "parent": "", "rollup": "1/2 done · 1 planned", "group": true, "search": "forge models-and-export  ---\nsummary: from an image to a game-ready 3d model: generate the glb, view it in the app, then export it with lods and checks for godot and unreal.\norder: 3\n---\n# 3d models and export\n\n<!-- group feature: status is rolled up from the features under it (parent: models-and-export). -->\n\n## what it is\n\nthe mesh side of forge: image to textured glb with the in-app three.js viewer (slice 1, done), and game export with face budgets, lod0 to lod3, triangle/bounds/uv checks and correct scale (slice 7, planned).\n\n## current state\n\ngeneration and viewing done; export not started.\n\n## design decisions\n\n- 2026-10-13: grouped as one feature because both halves live in `forge-mesh` and are measured against the same 700k-face test crate.\n\n## key files\n\n- `crates/forge-mesh`, `ui/src/viewport`, `fixtures/glb700k.glb`\n\n## history\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 1: Image to GLB and the 3D viewer (v0.1)", "slug": "mesh-viewer", "href": "../Forge/devlog/index.html#f-mesh-viewer", "status": "done", "own_status": "done", "summary": "Drop in an image, get a textured GLB (Pixal3D or TRELLIS.2) that opens in the three.js viewport in well under a second.", "parent": "models-and-export", "rollup": "", "group": false, "search": "forge mesh-viewer 3d models and export ---\nstatus: done\nsummary: drop in an image, get a textured glb (pixal3d or trellis.2) that opens in the three.js viewport in well under a second.\nstarted: 2026-10-11\nparent: models-and-export\norder: 1\n---\n# slice 1: image to glb and the 3d viewer (v0.1)\n\n## what it is\n\nfrom any image (generated, final or dropped in), **make 3d model** runs the `mesh.from_image` recipe (pixal3d default, trellis.2 selectable) and opens the textured glb in the viewport. rust builds a ~50k-triangle meshopt preview and a compressed full mesh once per hash; the viewer shows the preview, then streams the full mesh.\n\n## current state\n\ndone and committed (`2420860`). the 700k-face preview gate (< 300 ms) failed in the whole-log gate report (p95 421 ms) because of the first open after each launch; fixed on 2026-10-13 by warming the renderer at idle (uncommitted, measured only in edge: first-open preview 15 to 21 ms, full 260 to 266 ms). needs an in-app measurement with a rebuilt forge.\n\n## design decisions\n\n- 2026-10-11: mesh path built first (before image stages) because a 700k-face glb is the heaviest data path in the app.\n- 2026-10-11: load the preview first, then fetch the full mesh. requesting both in parallel delayed the preview from 0.5 s to 1.2 s.\n- 2026-10-11: webgpu with automatic webgl 2 fallback, remembered per browser build; chromium 141 rejected three.js r186's texture-view swizzle.\n- 2026-10-13: start webgpu and compile the preview shaders at idle after first paint, using a tiny warm-up mesh served from `forge://mesh/warmup` and built by the same rust preview step (a test checks the formats match). the first viewport adopts that renderer. ([session](../sessions/2026-10-12-slice-3-both-gpus/index.html))\n\n## key files\n\n- `crates/forge-mesh` (glb read/write, meshopt preview and full), `ui/src/viewport`, `ui/bench/viewer.html` + `viewer-bench.mjs` (open-time bench, `?warm=`)\n- `fixtures/glb700k.glb` (57 mb test crate)\n\n## gotchas\n\n- viewer files take ~1.3 s to build for a 700k mesh, so the first open straight after a job is logged as `cold` and excluded from the gate.\n- old slow opens stay in `perf/perf-log.jsonl`; judge fixes with `npm run gates -- --since-unix-ms <t>`.\n- check which backend the viewport badge shows (webgpu or webgl 2) when reporting numbers.\n\n## open questions\n\n## history\n\n- 2026-10-11 slice 1 built (before this devlog; commit `2420860`).\n- 2026-10-13 [slice 3: both gpus](../sessions/2026-10-12-slice-3-both-gpus/index.html): first-open renderer warm-up.\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 7: Game export (v0.3)", "slug": "game-export", "href": "../Forge/devlog/index.html#f-game-export", "status": "planned", "own_status": "planned", "summary": "A chosen model exports ready for Godot and Unreal: face budget, LOD0 to LOD3, checks, scale in metres.", "parent": "models-and-export", "rollup": "", "group": false, "search": "forge game-export 3d models and export ---\nstatus: planned\nsummary: a chosen model exports ready for godot and unreal: face budget, lod0 to lod3, checks, scale in metres.\nparent: models-and-export\norder: 7\n---\n# slice 7: game export (v0.3)\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\nface budget per asset category, lods in rust, triangle/bounds/uv coverage checks; glb to `pipeline\\06_export` for both engines (unreal imports gltf natively). gate: lods for a 700k mesh < 3 s. v0.3 checkpoint.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "feature", "project": "Forge", "title": "Asset stages: map to asset images", "slug": "asset-stages", "href": "../Forge/devlog/index.html#f-asset-stages", "status": "planned", "own_status": "", "summary": "The creative path from a world idea to clean asset images: map, then concept art per region, then isolated images of each prop, building and character.", "parent": "", "rollup": "0/3 done · 3 planned", "group": true, "search": "forge asset-stages  ---\nsummary: the creative path from a world idea to clean asset images: map, then concept art per region, then isolated images of each prop, building and character.\norder: 2\n---\n# asset stages: map to asset images\n\n<!-- group feature: status is rolled up from the features under it (parent: asset-stages). -->\n\n## what it is\n\nthe three stages of the forge plan's v1 user flow that produce images (slices 4 to 6). each one runs on the options loop and hands its pick to the next: a map with named regions, concept paintings consistent with the map, then a list of items from the chosen concept with an isolated image each. the v0.2 checkpoint is one prompt going from a map to a chosen 3d model without opening comfyui.\n\n## current state\n\nnot started. slice 4 (map) is next in the mvp plan.\n\n## design decisions\n\n- 2026-10-13: grouped as one feature because the three stages share the planner (claude api with an offline fallback), `image.edit` with references, and upload-once-by-hash.\n\n## key files\n\n- planned: `crates/forge-planner`; recipes under `crates/forge-comfy/recipes/`\n\n## history\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 4: Map stage", "slug": "map-stage", "href": "../Forge/devlog/index.html#f-map-stage", "status": "planned", "own_status": "planned", "summary": "A world idea becomes a map in up to three matching views (schematic, painted, satellite-like) with named regions.", "parent": "asset-stages", "rollup": "", "group": false, "search": "forge map-stage asset stages: map to asset images ---\nsummary: a world idea becomes a map in up to three matching views (schematic, painted, satellite-like) with named regions.\nparent: asset-stages\norder: 4\nstatus: planned\n---\n# slice 4: map stage\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\nplanner (claude api, offline template fallback, plan cache) expands the prompt; the first view picked becomes the reference for the other two (`image.edit`); an llm names regions and points of interest, stored as nodes; map view with clickable region markers. gate: planner p95 < 3 s; other views generate in the background.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 5: Concept art stage", "slug": "concept-stage", "href": "../Forge/devlog/index.html#f-concept-stage", "status": "planned", "own_status": "planned", "summary": "Click a map region and get 4 concept paintings consistent with the map.", "parent": "asset-stages", "rollup": "", "group": false, "search": "forge concept-stage asset stages: map to asset images ---\nstatus: planned\nsummary: click a map region and get 4 concept paintings consistent with the map.\nparent: asset-stages\norder: 5\n---\n# slice 5: concept art stage\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\n`image.edit` with 1 to 4 references, graph extended in code per reference; map and style images uploaded once per machine and reused by hash. gate: reference uploads after the first cost 0 bytes.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 6: Asset images and background 3D queue (v0.2)", "slug": "asset-stage", "href": "../Forge/devlog/index.html#f-asset-stage", "status": "planned", "own_status": "planned", "summary": "A concept becomes a list of props, buildings and characters with clean isolated images; chosen ones get 3D in the background.", "parent": "asset-stages", "rollup": "", "group": false, "search": "forge asset-stage asset stages: map to asset images ---\nstatus: planned\nsummary: a concept becomes a list of props, buildings and characters with clean isolated images; chosen ones get 3d in the background.\nparent: asset-stages\norder: 6\n---\n# slice 6: asset images and background 3d queue (v0.2)\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\nclaude vision lists items in the chosen concept as soon as it is picked; isolated asset image per item, optional extra angles (`image.angle`); chosen assets queue 3d at background priority on whichever gpu is free. gate: foreground image jobs never wait behind a 3d job for more than one job's length; 60 fps with 10 meshes queued. v0.2 checkpoint: one prompt from map to a chosen 3d model without opening comfyui.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "feature", "project": "Forge", "title": "Slice 8: Voice (v0.4)", "slug": "voice", "href": "../Forge/devlog/index.html#f-voice", "status": "planned", "own_status": "planned", "summary": "Push-to-talk prompts and spoken summaries, fully local.", "parent": "", "rollup": "", "group": false, "search": "forge voice  ---\nsummary: push-to-talk prompts and spoken summaries, fully local.\norder: 8\nstatus: planned\n---\n# slice 8: voice (v0.4)\n\n<!-- agent memory for this feature. status values: idea, planned, in-progress, done, parked. keep \"current state\" true; append to the dated sections. -->\n\n## what it is\n\nwhisper via whisper-rs, model loaded on first use; windows built-in voices for replies. gate: stt < 1 s for a 10 s utterance, never delaying a gpu job. v0.4 checkpoint.\n\nplanned in the [mvp plan](../../docs/forge%20mvp%20implementation%20plan.md); not started.\n\n## current state\n\n## design decisions\n\n<!-- - yyyy-mm-dd: decision. why. (session: ../sessions/<dir>/) -->\n\n## key files\n\n## gotchas\n\n## open questions\n\n## history\n\n<!-- - yyyy-mm-dd [session title](../sessions/<dir>/index.html): one line on what happened -->\n"}, {"kind": "session", "project": "Forge", "title": "Slice 3: both GPUs", "href": "../Forge/devlog/sessions/2026-10-12-slice-3-both-gpus/index.html", "started": "2026-10-12T22:02:45.486Z", "outcome": "partial", "summary": "Implemented slice 3 of the MVP plan: jobs fan out across the RTX 5080 and the RTX 4080 Super, with a node agent, a GPU status panel and lost-machine fallback. Two of the slice's gates miss on the real GPUs, for model-memory reasons rather than Forge overhead. Afterwards, at Jon's request, fixed the…", "features": ["render-farm", "mesh-viewer"], "media": [], "session_ids": ["0f47afb8-35fc-4afc-b1af-8dfe23c54fa4"], "cwd": "D:\\Game Dev", "run": "", "search": "forge slice 3: both gpus implemented slice 3 of the mvp plan: jobs fan out across the rtx 5080 and the rtx 4080 super, with a node agent, a gpu status panel and lost-machine fallback. two of the slice's gates miss on the real gpus, for model-memory reasons rather than forge overhead. afterwards, at jon's request, fixed the slice 1 first-open preview gate and recorded the agent-sampled gate run. nothing committed. *backfilled on 2026-10-13 from the session transcript when the devlog was set up; no screenshots were taken during the session.* @\"d:\\game dev\\forge\\docs\\forge mvp implementation plan.md\"\nimplement slice 3 render-farm mesh-viewer how does forge get gpu stats and control comfyui on the node? a small `forge-agent.exe` on the 4080 pc: http on :8190 with a token, nvidia-smi sampling twice a second, start/stop/restart of a comfyui it launched itself. comfyui exposes neither gpu utilisation nor loaded models, and nvidia-smi only runs locally. a token on the pipeline share means no manual pairing. should forge stop a comfyui it did not start? never. the agent only stops its own comfyui (when forge exits, or after 5 minutes of silence). the node's comfyui is started by the gennode login task and also serves the 3d queue watcher. how to fix the two-gpu ratio and gpu-busy gate misses? not changed: recommended an fp8 klein + text encoder that fit in 16 gb together, left to jon. comfyui's own timings put the floor at 0.69; forge adds ~1%. the misses come from per-prompt text-encoder loads and model swaps on the 16 gb card. model choice affects quality, so it is the user's call. after the gate report: add the node-sampled numbers to the perf log, or fix the slice 1 first-open preview gate? both (\"do both\"). the preview miss (p95 421 ms) was only the first open after launch paying for webgpu start-up and shader compiles. how to make the first model open fast? warm the renderer at idle after first paint with a tiny mesh in the exact preview format (`forge://mesh/warmup`, built by the same rust step; a test checks formats match); the first viewport adopts that renderer. moves ~135 ms of start-up off the click; first-open preview went from 138–320 ms to 15–21 ms in edge. started from the mvp plan's slice 3: agent, scheduler capability check and model affinity, remote outputs streamed to disk, status panel. built `forge-agent` (gpu sampler, comfyui control, token auth) and smoke-tested it on the workstation against the real comfyui; killing it left no stray processes. extended `forge-sched` with a machine registry, startup capability check (trellis.2 excluded on the 4080), affinity and spread; added `machines.rs` for liveness and lost-machine handling. two-mock headless suite `headless_two_gpus.rs`: 2 + 2 per round, 0 avoidable reloads, ratio 0.50, and a simulated pulled cable (round finished 5.9 s later with 0 failed jobs). ui: **gpus 2/2** badge and per-machine status panel; placeholder tiles show which gpu each option is on. checked in a browser with fake data (`ui/bench/app.html`), because the running forge.exe blocked a second window. `npm run fanout` on both real gpus (agent not yet installed): ratio 0.69 and one round at 67% busy, both misses; overhead p95 278 ms passes. the ratio is set by the gpus: each prompt loads the 7.7 gb qwen3 text encoder on every machine, and the 4080 is ~20% slower on these drafts. floor ≈ 0.68 even with zero overhead. hit the usage limit at the end of the first part; the last edit (merging new machine settings into an existing `settings.json`) compiled but was not re-tested. after \"look at the gates output\": ran `npm run gates` over the whole log, including the 16:35 run with the agent on the node. busy 0.18 in one round (node swapping models from ram), ratio 0.70, and the slice 1 preview gate failing at p95 421 ms. after \"do both\": idle renderer warm-up for the first model, and the node-sampled run added to `docs/perf-log.md`. all rust and ui tests pass."}]};
+// Set when devlog_server.py serves this page: then the browser can change feature status and run Claude sessions.
+const SERVER = /*__SERVER__*/null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem("devlog:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v) { try { localStorage.setItem("devlog:" + k, JSON.stringify(v)); } catch {} } };
+const abs = (href) => new URL(href, location.href).href.split("#")[0];
+const fmtDay = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+const fmtShort = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+let pages = [], sessions = [], byAbs = new Map();
+function setData(m) {
+  DATA = m;
+  pages = DATA.pages;
+  sessions = pages.filter((p) => p.kind === "session").sort((a, b) => (a.started || "").localeCompare(b.started || ""));
+  byAbs = new Map();
+  for (const p of pages) if (p.kind !== "feature") byAbs.set(decodeURI(abs(p.href)).toLowerCase(), p);
+  $("#gen").textContent = "updated " + fmtShort(DATA.generated);
+}
+setData(DATA);
+
+let tab = store.get("tab", "projects");
+if (tab === "media") tab = "projects";
+let current = null;   // the page entry shown, or null for an unknown page
+let currentHref = "index.html";
+
+// ---------- navigation ----------
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h === "media") return showGallery();
+  if (h.startsWith("run/") && SERVER) return showRun(h.slice(4));
+  const href = h.startsWith("/") ? h.slice(1) : "index.html";
+  showPage(href);
+}
+function go(href) {
+  const target = href === "media" ? "#media" : href.startsWith("run/") ? "#" + href : "#/" + href;
+  if (location.hash !== target) location.hash = target; else route();
+  document.body.classList.remove("nav-open");
+}
+function showOnly(id) {
+  for (const x of ["frame", "gallery", "runview"]) $("#" + x).style.display = x === id ? "block" : "none";
+  if (id !== "runview") openRun = null;
+}
+function showPage(href) {
+  setTabs();
+  showOnly("frame");
+  const frame = $("#frame");
+  frame.style.display = "block";
+  const want = abs(href) + (href.includes("#") ? "#" + href.split("#")[1] : "");
+  if (frame.dataset.src !== want) { frame.dataset.src = want; frame.src = want; }
+  setCurrent(href);
+}
+function setCurrent(href) {
+  currentHref = href;
+  const base = href.split("#")[0];
+  current = pages.find((p) => p.href === href) || pages.find((p) => p.href === base && p.kind !== "feature") || null;
+  $("#ttl").textContent = current ? (current.kind === "session" ? current.title + " · " + current.project : current.title) : decodeURI(base.split("/").pop());
+  $("#kind").textContent = current ? current.kind : "file";
+  $("#open").href = abs(href) + (href.includes("#") ? "#" + href.split("#")[1] : "");
+  // From a non-session page, either button jumps to the newest session.
+  const i = current && current.kind === "session" ? sessions.indexOf(current) : -1;
+  $("#prev").disabled = i === -1 ? !sessions.length : i <= 0;
+  $("#next").disabled = i === -1 ? !sessions.length : i >= sessions.length - 1;
+  document.title = (current ? current.title : "Devlog") + " · Devlog browser";
+  if (current && current.project) store.set("lastProject", current.project);
+  renderActions();
+  highlight();
+}
+function step(d) {
+  const i = current && current.kind === "session" ? sessions.indexOf(current) : -1;
+  const j = i === -1 ? sessions.length - 1 : i + d;
+  if (sessions[j]) go(sessions[j].href);
+}
+// Pages report where they are, so links followed inside the frame keep the sidebar and the address in step.
+window.addEventListener("message", (e) => {
+  const key = e.data && e.data.devlogKey;   // shortcuts pressed while the page in the frame has focus
+  if (key === "j") return step(1);
+  if (key === "k") return step(-1);
+  if (key === "/" || key === "palette") { openPalette(); return; }
+  const url = e.data && e.data.devlog;
+  if (!url) return;
+  const [path, hash] = url.split("#");
+  const p = byAbs.get(decodeURI(path).toLowerCase());
+  let href = p ? p.href : null;
+  if (!href) {
+    const rootDir = abs("index.html").replace(/index\.html$/, "");
+    href = path.startsWith(rootDir) ? path.slice(rootDir.length) : path;
+  }
+  if (hash && p && pages.some((x) => x.href === href + "#" + hash)) href += "#" + hash;
+  $("#frame").dataset.src = path + (hash ? "#" + hash : "");
+  history.replaceState(null, "", "#/" + href);
+  setCurrent(href);
+});
+window.addEventListener("hashchange", route);
+
+// ---------- sidebar ----------
+function dot(status) { return `<span class="dot s-${esc(status || "")}" title="${esc(status || "")}"></span>`; }
+function itemHTML(p, opts = {}) {
+  const date = opts.date === false ? "" : `<span class="d">${esc(p.kind === "session" ? fmtShort(p.started) : "")}</span>`;
+  const label = opts.label || p.title;
+  return `<a class="item" href="#/${esc(p.href)}" data-go="${esc(p.href)}" title="${esc(p.summary || p.title)}">${dot(p.outcome || p.status)}<span class="t">${opts.raw ? label : esc(label)}</span>${date}</a>`;
+}
+const chev = `<svg class="chev" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg>`;
+function group(key, name, count, body, openByDefault) {
+  const open = store.get("open:" + key, openByDefault);
+  return `<div class="group ${open ? "" : "closed"}" data-key="${esc(key)}"><div class="ghead">${chev}${esc(name)} <span class="n">${count}</span></div><div class="gbody">${body}</div></div>`;
+}
+function renderProjects() {
+  const html = DATA.projects.map((pr) => {
+    const p = pages.find((x) => x.kind === "project" && x.project === pr.name);
+    const ss = pages.filter((x) => x.kind === "session" && x.project === pr.name).sort((a, b) => (b.started || "").localeCompare(a.started || ""));
+    // Features arrive in tree order (each group followed by what is under it); `parent` nests them.
+    const fs = pages.filter((x) => x.kind === "feature" && x.project === pr.name);
+    const known = new Set(fs.map((x) => x.slug));
+    const tree = (f) => {
+      const kids = fs.filter((x) => x.parent === f.slug);
+      if (!kids.length) return itemHTML(f, { date: false });
+      const key = pr.name + ":g:" + f.slug;
+      const open = store.get("open:" + key, f.status !== "done");
+      const label = `${esc(f.title)} <span class="n">${esc((f.rollup || "").split(" · ")[0])}</span>`;
+      return `<div class="ftree ${open ? "" : "closed"}" data-key="${esc(key)}"><div class="frow"><button class="tw" aria-label="Show or hide what is in ${esc(f.title)}">${chev}</button>`
+        + itemHTML(f, { date: false, label, raw: true }) + `</div><div class="gbody">${kids.map(tree).join("")}</div></div>`;
+    };
+    const sBody = ss.length ? ss.map((s) => itemHTML(s)).join("") : `<div class="empty">No sessions yet</div>`;
+    const fBody = fs.length ? `<div class="flist">${fs.filter((x) => !x.parent || !known.has(x.parent)).map(tree).join("")}</div>`
+                            : `<div class="empty">No features yet</div>`;
+    return `<div class="proj">${itemHTML(p, { date: false, label: `${esc(pr.name)} <span class="n">${ss.length}</span>`, raw: true })}`
+      + group(pr.name + ":s", "Sessions", ss.length, sBody, true)
+      + group(pr.name + ":f", "Features", fs.length, fBody, pr.name !== "Workspace")
+      + `</div>`;
+  }).join("");
+  $("#nav").innerHTML = itemHTML(pages.find((p) => p.kind === "home"), { date: false, label: "Home" }) + html;
+}
+function renderTimeline() {
+  let last = "", out = "";
+  for (const s of [...sessions].reverse()) {
+    const day = fmtDay(s.started);
+    if (day !== last) { out += `<div class="day">${esc(day)}</div>`; last = day; }
+    out += itemHTML(s, { label: `${esc(s.title)} <span class="n">· ${esc(s.project)}</span>`, raw: true, date: false });
+  }
+  $("#nav").innerHTML = out || `<div class="empty">No sessions yet</div>`;
+}
+function highlightText(text, terms) {
+  let h = esc(text);
+  for (const t of terms) if (t) h = h.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), (m) => `<span class="hl">${m}</span>`);
+  return h;
+}
+function renderNav() {
+  if (tab === "timeline") renderTimeline(); else if (tab === "runs" && SERVER) renderRuns(); else renderProjects();
+  highlight();
+}
+function highlight() {
+  document.querySelectorAll("#nav .item.on").forEach((e) => e.classList.remove("on"));
+  const exact = document.querySelector(`#nav .item[data-go="${CSS.escape(currentHref)}"]`);
+  const el = exact || document.querySelector(`#nav .item[data-go="${CSS.escape(currentHref.split("#")[0])}"]`);
+  if (el) {
+    for (let t = el.closest(".ftree.closed, .group.closed"); t; t = t.parentElement && t.parentElement.closest(".ftree.closed, .group.closed")) t.classList.remove("closed");
+    el.classList.add("on");
+    if (!isVisible(el)) el.scrollIntoView({ block: "nearest" });
+  }
+}
+function isVisible(el) { const r = el.getBoundingClientRect(), n = $("#nav").getBoundingClientRect(); return r.top >= n.top && r.bottom <= n.bottom; }
+
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-go]");
+  if (a && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); go(a.dataset.go); return; }
+  const tw = e.target.closest(".tw");
+  if (tw) { const t = tw.closest(".ftree"); t.classList.toggle("closed"); store.set("open:" + t.dataset.key, !t.classList.contains("closed")); return; }
+  const gh = e.target.closest(".ghead");
+  if (gh) { const g = gh.parentElement; g.classList.toggle("closed"); store.set("open:" + g.dataset.key, !g.classList.contains("closed")); }
+  const tb = e.target.closest(".tabs button");
+  if (tb) {
+    if (tb.dataset.tab === "media") { go("media"); return; }
+    tab = tb.dataset.tab; store.set("tab", tab); setTabs(); renderNav();
+  }
+});
+function setTabs(active = tab) { document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === active)); }
+$("#prev").onclick = () => step(-1);
+$("#next").onclick = () => step(1);
+$("#menu").onclick = () => document.body.classList.toggle("nav-open");
+$("#cmdk").onclick = () => openPalette();
+$("#cmdk-voice").onclick = () => openPalette("", true);
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) { e.preventDefault(); return pal.open ? closePalette() : openPalette(); }
+  if (e.target.matches("input,select,textarea") || e.ctrlKey || e.metaKey || e.altKey || document.querySelector("dialog[open]") || pal.open) return;
+  if (e.key === "/") { e.preventDefault(); openPalette(); }
+  else if (e.key === "j") step(1);
+  else if (e.key === "k") step(-1);
+  else if (e.key.length === 1 && /[a-z]/i.test(e.key) && e.key !== "j" && e.key !== "k") openPalette(e.key);  // just start typing
+});
+
+// ---------- media gallery ----------
+function showGallery() {
+  setTabs("media");
+  showOnly("gallery");
+  $("#actions").innerHTML = "";
+  const g = $("#gallery");
+  const media = sessions.flatMap((s) => (s.media || []).map((m) => ({ ...m, session: s }))).reverse();
+  const projects = [...new Set(media.map((m) => m.session.project))];
+  const feats = [...new Set(media.map((m) => m.feature).filter(Boolean))].sort();
+  const f = store.get("mediaFilter", { project: "", feature: "", kind: "" });
+  g.innerHTML = `<div class="bar"><h1>Screenshots and video</h1>
+    <select data-f="project"><option value="">All projects</option>${projects.map((p) => `<option ${f.project === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+    <select data-f="feature"><option value="">All features</option>${feats.map((p) => `<option ${f.feature === p ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>
+    <select data-f="kind"><option value="">Images and video</option><option value="image" ${f.kind === "image" ? "selected" : ""}>Images</option><option value="video" ${f.kind === "video" ? "selected" : ""}>Video</option></select></div>
+    <div class="grid" id="tiles"></div>`;
+  const draw = () => {
+    const shown = media.filter((m) => (!f.project || m.session.project === f.project) && (!f.feature || m.feature === f.feature) && (!f.kind || m.kind === f.kind));
+    $("#tiles").innerHTML = shown.length ? shown.map((m) => `<div class="tile" data-go="${esc(m.session.href)}" title="Open the session">
+        <div class="m">${m.kind === "video" ? `<video src="${esc(m.src)}" muted loop playsinline preload="metadata" onmouseenter="this.play()" onmouseleave="this.pause()"></video><span class="play">▶ video</span>` : `<img src="${esc(m.src)}" alt="${esc(m.caption)}" loading="lazy">`}</div>
+        <div class="c">${esc(m.caption || m.src.split("/").pop())}<div class="s">${esc(m.session.project)} · ${esc(m.session.title)} · ${esc(fmtShort(m.session.started))}</div></div></div>`).join("")
+      : `<div class="empty">No media yet. Sessions add screenshots and video as features become visible.</div>`;
+  };
+  g.querySelectorAll("select").forEach((s) => s.onchange = () => { f[s.dataset.f] = s.value; store.set("mediaFilter", f); draw(); });
+  draw();
+  current = null; currentHref = "media";
+  $("#ttl").textContent = "Screenshots and video"; $("#kind").textContent = "media";
+  $("#prev").disabled = $("#next").disabled = true; $("#open").removeAttribute("href");
+  highlight();
+}
+
+// ---------- dev tool: only when devlog_server.py serves this page ----------
+let RUNS = [], openRun = null, CLAUDE = null, META = { statuses: [], permission_modes: [] }, feedItems = null, dlgCtx = null;
+const ACTIVE = ["working", "waiting", "starting", "running"];
+const STATE_LABEL = { working: "working", waiting: "waiting for you", starting: "starting", running: "running", ended: "ended", failed: "failed" };
+const PERM_HINT = {
+  auto: "Auto mode: routine actions go ahead, risky ones ask.",
+  acceptEdits: "Edits files without asking; asks before commands.",
+  manual: "Asks before every edit and command.",
+  plan: "Read-only: researches and proposes a plan, changes nothing.",
+  dontAsk: "Never asks: anything not already allowed is refused.",
+};
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", body: body ? JSON.stringify(body) : undefined,
+    headers: { "X-Devlog-Token": SERVER.token, ...(body ? { "Content-Type": "application/json" } : {}) } });
+  const j = await r.json().catch(() => ({ error: r.statusText }));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg, err) {
+  const t = $("#toast");
+  t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block";
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (t.style.display = "none"), err ? 9000 : 3500);
+}
+async function refresh(reloadFrame) {
+  const s = await api("/api/state");
+  CLAUDE = s.claude; META = s; RUNS = s.runs;
+  setData(s.manifest);
+  const active = RUNS.filter((r) => ACTIVE.includes(r.state)).length;
+  $("#runcount").textContent = active ? String(active) : "";
+  document.body.classList.toggle("stt", !!(s.stt && s.stt.available));
+  const loggedOut = !!(s.auth && s.auth.loggedIn === false);
+  $("#authbar").hidden = !loggedOut && !!CLAUDE;
+  $("#authbar").innerHTML = !CLAUDE ? "Claude Code was not found on this PC, so sessions cannot be launched."
+    : "Claude Code is not logged in on this PC, so sessions cannot start yet.<br><button class='btn' data-login='1'>Log in to Claude Code</button>";
+  $("#rd-auth").hidden = !loggedOut;
+  $("#rd-go").disabled = loggedOut;
+  renderNav();
+  if (openRun) drawRun();
+  else if (currentHref !== "media") setCurrent(currentHref);
+  if (reloadFrame && $("#frame").style.display !== "none") {
+    // Same-origin when served, so reload in place (setting the same URL with a #fragment would not refetch).
+    try { $("#frame").contentWindow.location.reload(); } catch { $("#frame").src = $("#frame").dataset.src; }
+  }
+}
+
+const NOTE_BTN = `<button class="btn" id="act-note" title="Add a note: speak it (or type) and it is saved in the devlog">`
+  + `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0010 0M8 12.5V15"/></svg>`
+  + `<span class="lbl-sm">Note</span></button>`;
+// Header actions for the page on show: status and Run for a feature, Resume for a session, New session for a project.
+function renderActions() {
+  const box = $("#actions");
+  if (!SERVER) { box.innerHTML = ""; return; }
+  if (box.contains(document.activeElement)) return;  // do not rebuild a select the user is using
+  const c = current;
+  if (c && c.kind === "feature") {
+    const opts = (c.group ? [["", `auto (${c.status || "none"})`]] : []).concat(META.statuses.map((s) => [s, s]));
+    const val = c.group ? c.own_status : c.status;
+    box.innerHTML = `<select class="sel" id="act-status" title="Feature status" aria-label="Feature status">${opts.map(([v, l]) =>
+      `<option value="${esc(v)}" ${v === val ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
+      ${NOTE_BTN}<button class="btn primary" id="act-run" title="Start a Claude session on this ${c.group ? "group" : "feature"}">▶ <span class="lbl-sm">Run in Claude</span></button>`;
+    $("#act-note").onclick = () => openNoteDialog({ project: c.project, feature: c }, true);
+    $("#act-status").onchange = (e) => setStatus(c, e.target.value);
+    $("#act-run").onclick = () => openRunDialog({ project: c.project, feature: c });
+  } else if (c && c.kind === "session" && (c.session_ids || []).length) {
+    box.innerHTML = `<button class="btn" id="act-resume" title="Continue this session in Claude, with its full history">↻ <span class="lbl-sm">Resume</span></button>`;
+    $("#act-resume").onclick = () => openRunDialog({ project: c.project, resume: c });
+  } else if (c && c.kind === "project") {
+    box.innerHTML = NOTE_BTN.replace("Note", "Idea") + `<button class="btn" id="act-new" title="Start a Claude session in this project">▶ <span class="lbl-sm">New session</span></button>`;
+    $("#act-note").onclick = () => openNoteDialog({ project: c.project }, true);
+    $("#act-new").onclick = () => openRunDialog({ project: c.project });
+  } else box.innerHTML = "";
+}
+async function setStatus(f, status) {
+  try {
+    await api("/api/feature/status", { project: f.project, slug: f.slug, status });
+    toast(`${f.title}: ${status || "status now rolls up from its members"}`);
+    await refresh(true);
+  } catch (e) { toast(e.message, true); renderActions(); }
+}
+
+// Launch dialog.
+function syncDialog() {
+  const mode = document.querySelector("input[name=mode]:checked").value;
+  $("#rd-rc-row").style.display = mode === "terminal" ? "" : "none";
+  $("#rd-perm-hint").textContent = (PERM_HINT[$("#rd-perm").value] || "")
+    + (mode === "background" && $("#rd-perm").value !== "dontAsk" ? " Questions wait until you open it in a terminal." : "");
+}
+document.querySelectorAll("input[name=mode]").forEach((r) => (r.onchange = syncDialog));
+$("#rd-perm").onchange = syncDialog;
+async function openRunDialog(ctx) {
+  if (!CLAUDE) { toast("Claude Code was not found on this PC (set DEVLOG_CLAUDE to claude.exe).", true); return; }
+  dlgCtx = ctx;
+  const f = ctx.feature, r = ctx.resume, kind = ctx.kind || (f ? "feature" : r ? "resume" : "ask");
+  $("#rd-title").textContent = { feature: `Run: ${f && f.title}`, resume: `Resume: ${r && r.title}`, ask: `New session in ${ctx.project}`,
+    brainstorm: `Brainstorm with Claude · ${ctx.project}`, describe: `Describe with Claude: ${f && f.title}`, plan: `Plan with Claude: ${f && f.title}` }[kind];
+  $("#rd-sub").textContent = kind === "feature" ? `${ctx.project} · ${f.group ? "feature group, " + (f.rollup || "") : "status: " + (f.status || "none")}`
+    : kind === "resume" ? "Continues that conversation with its full history. Add a message, or leave it empty to just reopen it."
+    : kind === "brainstorm" ? "A conversation: Claude asks questions and offers options, then writes it up as an ideation doc."
+    : kind === "describe" ? "A conversation: Claude interviews you, then writes the summary and description into the feature file."
+    : kind === "plan" ? "Claude reads the feature and the code, asks what it must, and writes a plan into devlog/planning. No implementation."
+    : `Starts in the ${ctx.project} folder; it reads the devlog rules like any session.`;
+  const perm = store.get("perm", "auto");
+  $("#rd-perm").innerHTML = META.permission_modes.map((m) => `<option ${m === perm ? "selected" : ""}>${esc(m)}</option>`).join("");
+  // conversations need you there: they default to a terminal window
+  const mode = ["brainstorm", "describe"].includes(kind) ? "terminal" : store.get("mode", "terminal");
+  (document.querySelector(`input[name=mode][value="${mode}"]`) || document.querySelector("input[name=mode]")).checked = true;
+  $("#rd-rc").checked = store.get("rc", false);
+  $("#rd-mark").checked = true;
+  $("#rd-mark-row").style.display = kind === "feature" && !f.group && f.status !== "in-progress" ? "" : "none";
+  $("#rd-prompt").placeholder = r ? "Optional: what to do next in that session" : "What should Claude do?";
+  const generated = ["feature", "brainstorm", "describe", "plan"].includes(kind);
+  $("#rd-prompt").value = generated ? "Loading the prompt…" : (ctx.text || "");
+  syncDialog();
+  $("#rundlg").showModal();
+  if (generated) {
+    try {
+      const q = new URLSearchParams({ kind, project: ctx.project, slug: f ? f.slug : "", text: ctx.text || "" });
+      $("#rd-prompt").value = (await api(`/api/prompt?${q}`)).prompt;
+    } catch (e) { $("#rd-prompt").value = ""; toast(e.message, true); }
+  }
+  $("#rd-prompt").focus();
+}
+$("#runform").addEventListener("submit", async (e) => {
+  if (!e.submitter || e.submitter.value !== "go") return;  // Cancel closes the dialog
+  e.preventDefault();
+  const ctx = dlgCtx, mode = document.querySelector("input[name=mode]:checked").value, perm = $("#rd-perm").value;
+  store.set("mode", mode); store.set("perm", perm); store.set("rc", $("#rd-rc").checked);
+  const body = { project: ctx.project, prompt: $("#rd-prompt").value, mode, permission_mode: perm, remote_control: $("#rd-rc").checked };
+  $("#rd-go").disabled = true;
+  try {
+    const res = ctx.resume
+      ? await api("/api/resume", { ...body, session_id: ctx.resume.session_ids.at(-1), run_id: ctx.resume.run_id || "" })
+      : await api("/api/run", { ...body, slug: ctx.feature ? ctx.feature.slug : "", kind: ctx.kind || "",
+                                mark_in_progress: $("#rd-mark").checked && $("#rd-mark-row").style.display !== "none" });
+    $("#rundlg").close();
+    toast(mode === "terminal" ? "Started in a new terminal window." : "Started in the background.");
+    await refresh(true);
+    go("run/" + res.run.id);
+  } catch (err) { toast(err.message, true); }
+  finally { $("#rd-go").disabled = !!(META.auth && META.auth.loggedIn === false); }
+});
+
+// Runs: the sidebar list and one run's page.
+function stateHTML(r) { return `<span class="state st-${esc(r.state)}"><span class="dot"></span>${esc(STATE_LABEL[r.state] || r.state)}</span>`; }
+function renderRuns() {
+  const dotFor = (s) => (s === "ended" ? "done" : s === "failed" ? "blocked" : s === "waiting" ? "planned" : "in-progress");
+  $("#nav").innerHTML = RUNS.length ? RUNS.map((r) => `<a class="item" href="#run/${esc(r.id)}" data-go="run/${esc(r.id)}" title="${esc(r.name)}: ${esc(STATE_LABEL[r.state] || r.state)}">`
+      + `<span class="dot s-${dotFor(r.state)}"></span><span class="t">${esc(r.name)}</span><span class="d">${esc(fmtShort(r.started))}</span></a>`).join("")
+    : `<div class="empty">Nothing launched yet. Open a feature and press ▶ Run in Claude, or right-click it.</div>`;
+}
+function showRun(id) {
+  if (tab !== "runs") { tab = "runs"; store.set("tab", tab); renderNav(); }
+  setTabs("runs"); showOnly("runview");
+  openRun = id; feedItems = null; current = null; currentHref = "run/" + id;
+  $("#kind").textContent = "run"; $("#actions").innerHTML = "";
+  $("#prev").disabled = $("#next").disabled = true; $("#open").removeAttribute("href");
+  drawRun(); loadActivity(); highlight();
+}
+function drawRun() {
+  const r = RUNS.find((x) => x.id === openRun), v = $("#runview");
+  if (!r) { v.innerHTML = `<div class="empty">Loading the run…</div>`; return; }
+  $("#ttl").textContent = r.name; document.title = r.name + " · Devlog browser";
+  const active = ACTIVE.includes(r.state);
+  const feat = r.feature && pages.find((p) => p.kind === "feature" && p.project === r.project && p.slug === r.feature);
+  v.innerHTML = `<h1>${esc(r.name)}</h1>
+    <div class="rmeta">${stateHTML(r)}<span>${r.mode === "terminal" ? "terminal window" : "background"}</span><span>permissions: ${esc(r.permission_mode)}</span>
+      <span>started ${esc(fmtTime(r.started))}</span>${r.ended ? `<span>ended ${esc(fmtTime(r.ended))}${r.exit_code != null ? ` (exit ${esc(r.exit_code)})` : ""}</span>` : ""}
+      ${r.last_activity ? `<span>last activity ${esc(fmtTime(r.last_activity))}</span>` : ""}${r.note ? `<span>${esc(r.note)}</span>` : ""}</div>
+    <div class="rbtns">${r.log_href ? `<button class="btn primary" data-go="${esc(r.log_href)}">Open its devlog entry</button>` : ""}
+      ${feat ? `<button class="btn" data-go="${esc(feat.href)}">Feature: ${esc(feat.title)}</button>` : ""}
+      ${r.mode === "background" && active ? `<button class="btn" data-act="attach">Open in a terminal</button>` : ""}
+      ${active ? `<button class="btn" data-act="stop">Stop</button>` : `<button class="btn" data-act="resume">↻ Resume</button>`}</div>
+    ${r.state === "failed" && r.launch_output ? `<div class="panel"><h3>Launch output</h3><pre>${esc(r.launch_output)}</pre></div>` : ""}
+    <div class="panel"><h3>Recent activity</h3><ul class="feed" id="feed"><li class="empty">Loading…</li></ul></div>
+    <div class="panel"><h3>Prompt</h3><pre>${esc(r.prompt || "(resumed without a new message)")}</pre></div>
+    <div class="panel"><h3>Details</h3><pre>session ${esc(r.session_id)}\nfolder  ${esc(r.cwd)}\nrun     ${esc(r.id)}${r.log_href ? "" : "\nThe devlog entry appears once the session logs itself (at the end of its work)."}</pre></div>`;
+  v.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => runAction(r, b.dataset.act)));
+  drawFeed();
+}
+async function runAction(r, act) {
+  if (act === "resume") return openRunDialog({ project: r.project, resume: { title: r.name, session_ids: [r.session_id], run_id: r.id } });
+  if (act === "stop" && !confirm(`Stop "${r.name}"?`)) return;
+  try {
+    await api(`/api/runs/${encodeURIComponent(r.id)}/${act}`, {});
+    toast(act === "stop" ? "Stopped." : "Opened in a terminal window.");
+    await refresh();
+  } catch (e) { toast(e.message, true); }
+}
+async function loadActivity() {
+  if (!openRun) return;
+  const id = openRun;
+  try {
+    const j = await api(`/api/runs/${encodeURIComponent(id)}/activity`);
+    if (openRun === id) { feedItems = j.items; drawFeed(); }
+  } catch { /* the next poll retries */ }
+}
+function drawFeed() {
+  const el = $("#feed");
+  if (!el || !feedItems) return;
+  el.innerHTML = feedItems.length ? feedItems.slice().reverse().map((i) => `<li>${i.who === "tool"
+      ? `<span class="tool">${esc(i.text)}</span>` : `<span class="who">${esc(i.who)}</span>${esc(i.text)}`} <span class="n">${esc(fmtTime(i.at))}</span></li>`).join("")
+    : `<li class="empty">Nothing yet: the session has not started writing its transcript.</li>`;
+}
+
+// Right-click a feature in the sidebar: set its status or run it.
+document.addEventListener("contextmenu", (e) => {
+  if (!SERVER) return;
+  const a = e.target.closest("#nav .item[data-go]");
+  const f = a && pages.find((p) => p.kind === "feature" && p.href === a.dataset.go);
+  if (!f) return;
+  e.preventDefault();
+  const val = f.group ? f.own_status : f.status;
+  const opts = (f.group ? [["", `auto (${f.status || "none"})`]] : []).concat(META.statuses.map((s) => [s, s]));
+  const m = $("#ctx");
+  m.innerHTML = `<div class="head">${esc(f.title)}</div>` + opts.map(([v, l]) =>
+      `<button data-st="${esc(v)}" class="${v === val ? "cur" : ""}"><span class="dot s-${esc(v || f.status)}"></span>${esc(l)}${v === val ? " ✓" : ""}</button>`).join("")
+    + `<hr><button data-note="1">Add a note…</button><button data-run="1">▶ Run in Claude…</button>`;
+  m.style.display = "block";
+  m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + "px";
+  m.style.top = Math.min(e.clientY, innerHeight - m.offsetHeight - 8) + "px";
+  m.onclick = (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    m.style.display = "none";
+    if (b.dataset.run) openRunDialog({ project: f.project, feature: f });
+    else if (b.dataset.note) openNoteDialog({ project: f.project, feature: f }, true);
+    else setStatus(f, b.dataset.st);
+  };
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("#ctx")) $("#ctx").style.display = "none"; }, true);
+// Login happens in a terminal window the user signs in from; this page only opens it.
+document.addEventListener("click", async (e) => {
+  if (!e.target.closest("[data-login]")) return;
+  try {
+    await api("/api/login", {});
+    toast("A terminal window opened: sign in there. This page notices within half a minute.");
+  } catch (err) { toast(err.message, true); }
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#ctx").style.display = "none"; });
+
+// ---------- dictation: record here, transcribe on this PC with Whisper (devlog_stt.py via the server) ----------
+const mic = { rec: null, stream: null, chunks: [], btn: null, field: null, t0: 0, timer: null, raf: null, ctx: null, cancel: false };
+async function micStart(btn) {
+  if (mic.rec) return micStop();
+  const field = document.querySelector(btn.dataset.mic);
+  if (!field) return;
+  if (field.id === "pal-q") field.value = "";  // a spoken command replaces what was typed
+  try {
+    mic.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  } catch (e) { toast("Microphone not available: " + e.message, true); return; }
+  api("/api/stt/warm", {}).catch(() => {});  // load Whisper while you speak
+  const type = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
+  Object.assign(mic, { rec: new MediaRecorder(mic.stream, type ? { mimeType: type } : undefined), chunks: [], btn, field, t0: Date.now(), cancel: false });
+  mic.rec.ondataavailable = (e) => { if (e.data.size) mic.chunks.push(e.data); };
+  mic.rec.onstop = micUpload;
+  mic.rec.start(250);
+  btn.classList.add("rec"); btn.title = "Stop and transcribe (Alt+M) · Esc discards";
+  btn.innerHTML = '<span class="secs">0:00</span>';
+  mic.timer = setInterval(() => {
+    const s = Math.floor((Date.now() - mic.t0) / 1000);
+    const el = btn.querySelector(".secs");
+    if (el) el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    if (s >= 600) micStop();  // ten minutes is plenty for a prompt or a note
+  }, 250);
+  try {  // the ring around the button follows your voice level
+    mic.ctx = new AudioContext();
+    const an = mic.ctx.createAnalyser(); an.fftSize = 512;
+    mic.ctx.createMediaStreamSource(mic.stream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    const tick = () => {
+      an.getByteTimeDomainData(buf);
+      let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+      btn.style.setProperty("--lvl", Math.min(1, peak / 64).toFixed(2));
+      mic.raf = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch { /* no meter, recording still works */ }
+}
+function micStop(cancel) {
+  if (!mic.rec) return;
+  mic.cancel = !!cancel;
+  clearInterval(mic.timer); cancelAnimationFrame(mic.raf);
+  if (mic.ctx) mic.ctx.close().catch(() => {});
+  mic.rec.stop();
+  mic.stream.getTracks().forEach((t) => t.stop());
+  mic.btn.classList.remove("rec"); mic.btn.style.removeProperty("--lvl"); mic.btn.innerHTML = "";
+}
+async function micUpload() {
+  const { btn, field, chunks, rec, cancel } = mic;
+  Object.assign(mic, { rec: null, stream: null, chunks: [] });
+  btn.title = "Dictate (Alt+M): click, speak, click again";
+  if (cancel || !chunks.length) return;
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+    const r = await fetch("/api/transcribe", { method: "POST", body: blob,
+      headers: { "X-Devlog-Token": SERVER.token, "Content-Type": blob.type || "application/octet-stream" } });
+    const j = await r.json().catch(() => ({ error: r.statusText }));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    if (!j.text) { toast("Didn't catch any speech. Try again a little closer to the mic."); return; }
+    insertText(field, j.text);
+    field.dataset.dictated = "1";
+    if (field.id === "pal-q") palAfterVoice();
+  } catch (e) { toast("Transcription failed: " + e.message, true); }
+  finally { btn.classList.remove("busy"); btn.disabled = false; }
+}
+function insertText(field, text) {
+  const v = field.value, s = field.selectionStart ?? v.length, e = field.selectionEnd ?? v.length;
+  const before = v.slice(0, s), after = v.slice(e);
+  const lead = before && !/\s$/.test(before) ? " " : "", trail = after && !/^\s/.test(after) ? " " : "";
+  field.value = before + lead + text + trail + after;
+  const pos = (before + lead + text).length;
+  field.focus(); field.setSelectionRange(pos, pos);
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-mic]"); if (b) { e.preventDefault(); micStart(b); } });
+document.addEventListener("keydown", (e) => {
+  if (e.altKey && !e.ctrlKey && (e.key === "m" || e.key === "M") && document.body.classList.contains("stt")) {
+    e.preventDefault();
+    if (mic.rec) return micStop();
+    // the focused field's mic, else the open dialog's, else search
+    const f = document.activeElement;
+    let b = f && f.id ? document.querySelector(`[data-mic="#${f.id}"]`) : null;
+    if (!b) { const d = document.querySelector("dialog[open]"); b = d ? d.querySelector("[data-mic]") : null; }
+    if (b) micStart(b); else openPalette("", true);  // nowhere to type: speak a command
+  } else if (e.key === "Escape" && mic.rec) { e.preventDefault(); micStop(true); toast("Recording discarded."); }
+}, true);
+for (const d of ["#rundlg", "#notedlg"]) $(d).addEventListener("close", () => { if (mic.rec) micStop(true); });
+
+// ---------- notes: typed or dictated, into a feature file or a new ideation doc ----------
+let noteCtx = null;
+function syncNote() { $("#nd-name").style.display = document.querySelector("input[name=target]:checked").value === "ideation" ? "" : "none"; }
+document.querySelectorAll("input[name=target]").forEach((r) => (r.onchange = syncNote));
+function openNoteDialog(ctx, autoMic, prefill) {
+  noteCtx = ctx;
+  const f = ctx.feature;
+  $("#nd-title").textContent = f ? `Note: ${f.title}` : `Idea for ${ctx.project}`;
+  $("#nd-sub").textContent = f ? `${ctx.project} · ${f.group ? "feature group" : "feature"}` : `Saved as a new ideation doc in ${ctx.project}'s devlog`;
+  $("#nd-t-feature").style.display = f ? "" : "none";
+  document.querySelector(`input[name=target][value="${f ? "feature" : "ideation"}"]`).checked = true;
+  $("#nd-text").value = prefill || ""; $("#nd-name").value = "";
+  if (ctx.dictated) $("#nd-text").dataset.dictated = "1"; else delete $("#nd-text").dataset.dictated;
+  syncNote();
+  $("#notedlg").showModal();
+  if (autoMic && document.body.classList.contains("stt")) micStart(document.querySelector('[data-mic="#nd-text"]'));
+  else $("#nd-text").focus();
+}
+$("#noteform").addEventListener("submit", async (e) => {
+  if (!e.submitter || e.submitter.value !== "go") return;
+  e.preventDefault();
+  if (mic.rec) { toast("Stop the recording first: click the red mic."); return; }
+  const target = document.querySelector("input[name=target]:checked").value;
+  $("#nd-go").disabled = true;
+  try {
+    const r = await api("/api/note", { project: noteCtx.project, slug: noteCtx.feature ? noteCtx.feature.slug : "", target,
+                                       title: $("#nd-name").value, text: $("#nd-text").value, dictated: !!$("#nd-text").dataset.dictated });
+    $("#notedlg").close();
+    toast("Saved to " + r.path);
+    await refresh(true);
+  } catch (err) { toast(err.message, true); }
+  finally { $("#nd-go").disabled = false; }
+});
+
+// ---------- describe a feature: summary and "What it is", typed or dictated ----------
+let descF = null;
+async function openDescribeDialog(f) {
+  descF = f;
+  $("#ds-title").textContent = `Describe: ${f.title}`;
+  $("#ds-summary").value = ""; $("#ds-what").value = "Loading…";
+  $("#descdlg").showModal();
+  try {
+    const d = await api(`/api/feature/description?${new URLSearchParams({ project: f.project, slug: f.slug })}`);
+    $("#ds-summary").value = d.summary || ""; $("#ds-what").value = d.what || "";
+  } catch (e) { $("#ds-what").value = ""; toast(e.message, true); }
+  ($("#ds-summary").value ? $("#ds-what") : $("#ds-summary")).focus();
+}
+$("#descform").addEventListener("submit", async (e) => {
+  const v = e.submitter && e.submitter.value;
+  if (v === "claude") { const f = descF; setTimeout(() => openRunDialog({ project: f.project, feature: f, kind: "describe" }), 0); return; }
+  if (v !== "go") return;
+  e.preventDefault();
+  if (mic.rec) { toast("Stop the recording first: click the red mic."); return; }
+  $("#ds-go").disabled = true;
+  try {
+    await api("/api/feature/description", { project: descF.project, slug: descF.slug, summary: $("#ds-summary").value, what: $("#ds-what").value });
+    $("#descdlg").close(); toast(`Saved the description of ${descF.title}`); await refresh(true);
+  } catch (err) { toast(err.message, true); }
+  finally { $("#ds-go").disabled = false; }
+});
+$("#descdlg").addEventListener("close", () => { if (mic.rec) micStop(true); });
+
+// ---------- command palette: search everything and do anything, typed or spoken ----------
+const pal = { open: false, flow: null, sel: 0, items: [], voice: false };
+const NUMW = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const norm = (s) => String(s || "").toLowerCase().replace(/['’]/g, "")
+  .replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, (w) => NUMW[w])
+  .replace(/[^a-z0-9]+/g, " ").trim();
+const VERBS = /^(mark|set|make|flag|run|start|work|implement|build|continue|describe|define|spec|write|plan|brainstorm|new|add|create|capture|move|put|group|ungroup|note|resume|reopen|ask|claude|hey|go|open|show|list|find|navigate|take|jump|view|stop|refresh|log|whats|what|next|help)\b/;
+
+function aliases(p) {
+  const out = [norm(p.title)];
+  if (p.kind === "feature") {
+    out.push(norm(p.title.replace(/^(slice|milestone|phase|step)\s*\d+\s*:\s*/i, "").replace(/\s*\(v?\d[^)]*\)/g, "")), norm((p.slug || "").replace(/-/g, " ")));
+    const n = p.title.match(/^(slice|milestone|phase|step)\s*(\d+)/i);
+    if (n) out.push(`${n[1].toLowerCase()} ${n[2]}`);
+  }
+  if (p.kind === "project") out.push(norm(String(p.project).split("/").pop()));
+  return [...new Set(out.filter(Boolean))];
+}
+function score(q, p) {
+  q = norm(q);
+  if (!q) return 0;
+  const qt = q.split(" ");
+  let best = 0;
+  for (const a of (p._al || (p._al = aliases(p)))) {
+    if (a === q) return 100;
+    if (a.startsWith(q)) best = Math.max(best, 92);
+    else if (a.includes(q)) best = Math.max(best, 82);
+    const at = a.split(" ");
+    const hit = qt.filter((t) => at.some((w) => w === t || (t.length > 2 && w.startsWith(t)) || (t.length > 4 && w.startsWith(t.slice(0, -1))))).length;
+    if (hit) best = Math.max(best, Math.round(72 * hit / qt.length) - Math.max(0, at.length - qt.length - 2) * 3);
+  }
+  return best;
+}
+function runPages() { return RUNS.map((r) => ({ kind: "run", title: r.name, href: "run/" + r.id, project: r.project, run: r, state: r.state })); }
+function ranked(text, kinds, opts = {}) {
+  const pool = (kinds.includes("run") ? runPages() : []).concat(pages.filter((p) => kinds.includes(p.kind)))
+    .filter((p) => (!opts.project || p.project === opts.project) && (!opts.filter || opts.filter(p)));
+  if (!norm(text)) return pool.map((p) => ({ p, s: 50 }));
+  return pool.map((p) => ({ p, s: Math.max(score(text, p), kinds.includes("session") || kinds.includes("page") ? 0 : 0) }))
+    .filter((x) => x.s >= (opts.min ?? 40)).sort((a, b) => b.s - a.s);
+}
+const best = (text, kinds, opts) => ranked(text, kinds, opts)[0] || null;
+function fullText(text) {  // the old search: every word somewhere in a page's text
+  const terms = norm(text).split(" ").filter(Boolean);
+  if (!terms.length) return [];
+  return pages.filter((p) => p.kind !== "home" && terms.every((t) => p.search.includes(t)))
+    .sort((a, b) => ({ session: 0, feature: 1, project: 2 }[a.kind] - { session: 0, feature: 1, project: 2 }[b.kind]) || (b.started || "").localeCompare(a.started || ""));
+}
+function ctxFeature() { return current && current.kind === "feature" ? current : null; }
+function ctxProject() {
+  const names = DATA.projects.map((p) => p.name);
+  const p = (current && current.project) || store.get("lastProject", "");
+  if (names.includes(p)) return p;
+  // otherwise the project worked on most recently (the workspace only if nothing else has sessions)
+  const recent = [...sessions].reverse().find((s) => s.project !== "Workspace");
+  return recent ? recent.project : (names.find((n) => n !== "Workspace") || names[0]);
+}
+function statusOf(w) {
+  w = norm(w);
+  if (/^(done|complete|completed|finished|shipped|closed)$/.test(w)) return "done";
+  if (/^(in progress|inprogress|started|active|working|doing)$/.test(w)) return "in-progress";
+  if (/^(planned|todo|to do|backlog|next)$/.test(w)) return "planned";
+  if (/^(parked|paused|on hold|shelved|later)$/.test(w)) return "parked";
+  if (/^ideas?$/.test(w)) return "idea";
+  return null;
+}
+const STATUS_TAIL = "(done|complete|completed|finished|shipped|in progress|inprogress|started|active|planned|todo|to do|backlog|parked|paused|on hold|shelved|idea)";
+function splitProject(t) {  // "... in forge" / "... for the extraction game project"
+  for (const pr of DATA.projects) {
+    for (const a of new Set([norm(pr.name), norm(pr.name.split("/").pop())])) {
+      const m = t.match(new RegExp(`^(.*?)\\s*\\b(?:in|for|on|to|under)\\s+(?:the\\s+)?${a.replace(/ /g, "\\s+")}(?:\\s+project)?$`));
+      if (m) return { rest: m[1].trim(), project: pr.name };
+    }
+  }
+  return { rest: t, project: null };
+}
+const rawTail = (raw, re) => raw.replace(re, "").trim();
+const label = (p) => p.kind === "feature" ? `${p.title}` : p.kind === "session" ? `${p.title} · ${p.project}` : p.title;
+
+// Actions the palette can take.
+const ACT = {
+  go(href) { closePalette(); go(href); },
+  async status(f, st) { closePalette(); await setStatus(f, st); },
+  run(f) { closePalette(); openRunDialog({ project: f.project, feature: f }); },
+  claude(kind, project, f, text) { closePalette(); openRunDialog({ project, feature: f || null, kind, text: text || "" }); },
+  note(f, text) { closePalette(); openNoteDialog({ project: f.project, feature: f, dictated: pal.voice && !!text }, !text, text); },
+  idea(project, text) { closePalette(); openNoteDialog({ project, dictated: pal.voice && !!text }, !text, text); },
+  describe(f) { closePalette(); openDescribeDialog(f); },
+  async newFeature(project, name, parent, isGroup) {
+    closePalette();
+    try {
+      const r = await api("/api/feature/new", { project, name, parent: parent || "" });
+      await refresh();
+      go(r.href);
+      toast(`Created ${isGroup ? "feature group" : "feature"} “${name}”${isGroup ? "" : ". Describe it now, or press Esc to do it later."}`);
+      const f = pages.find((p) => p.kind === "feature" && p.project === project && p.slug === r.slug);
+      if (f && !isGroup) openDescribeDialog(f);
+    } catch (e) { toast(e.message, true); }
+  },
+  async move(f, parent) {
+    closePalette();
+    try { await api("/api/feature/parent", { project: f.project, slug: f.slug, parent: parent || "" }); toast(parent ? `Moved ${f.title} into ${(pages.find((p) => p.slug === parent && p.project === f.project) || {}).title || parent}` : `${f.title} is no longer in a group`); await refresh(true); }
+    catch (e) { toast(e.message, true); }
+  },
+  resume(s) { closePalette(); openRunDialog({ project: s.project, resume: s }); },
+  async open(project, app) { closePalette(); try { await api("/api/open", { project, app }); toast(`Opened ${project} in ${app === "code" ? "VS Code" : "Explorer"}`); } catch (e) { toast(e.message, true); } },
+  async stop(r) { closePalette(); if (confirm(`Stop "${r.name}"?`)) { try { await api(`/api/runs/${encodeURIComponent(r.id)}/stop`, {}); toast("Stopped."); await refresh(); } catch (e) { toast(e.message, true); } } },
+  tab(t) { closePalette(); tab = t; store.set("tab", t); setTabs(); renderNav(); if (t === "runs" && RUNS[0]) go("run/" + RUNS[0].id); },
+};
+const projectPage = (name) => pages.find((p) => p.kind === "project" && p.project === name);
+const lastSession = () => [...sessions].reverse().find((s) => (s.session_ids || []).length);
+
+// Command templates: browsable, and each asks for whatever it still needs, one step at a time.
+const TPL = [
+  { id: "go", ic: "→", title: "Go to a page…", words: "go open navigate jump page find search", steps: ["page"], run: ([p]) => ACT.go(p.href) },
+  { id: "status", ic: "●", live: 1, title: "Set a feature's status…", words: "mark status done complete finished in progress started planned parked idea", steps: ["feature", "status"], run: ([f, s]) => ACT.status(f, s) },
+  { id: "run", ic: "▶", live: 1, title: "Run a feature in Claude…", words: "run start work implement build claude session", steps: ["feature"], run: ([f]) => ACT.run(f) },
+  { id: "newfeat", ic: "+", live: 1, title: "New feature…", words: "new add create feature slice", steps: ["project", "text:Feature name", "group?"], run: ([p, n, g]) => ACT.newFeature(p, n, g, false) },
+  { id: "newgroup", ic: "+", live: 1, title: "New feature group…", words: "new add create group epic", steps: ["project", "text:Group name"], run: ([p, n]) => ACT.newFeature(p, n, "", true) },
+  { id: "describe", ic: "✎", live: 1, title: "Describe a feature…", words: "describe description define spec write what it is summary", steps: ["feature"], run: ([f]) => ACT.describe(f) },
+  { id: "describe-claude", ic: "✎", live: 1, title: "Work out a feature's description with Claude…", words: "describe description interview claude spec", steps: ["feature"], run: ([f]) => ACT.claude("describe", f.project, f) },
+  { id: "plan", ic: "☰", live: 1, title: "Plan a feature with Claude…", words: "plan planning design approach steps", steps: ["feature"], run: ([f]) => ACT.claude("plan", f.project, f) },
+  { id: "move", ic: "↳", live: 1, title: "Move a feature into a group…", words: "move group under parent regroup ungroup", steps: ["feature", "group?"], run: ([f, g]) => ACT.move(f, g) },
+  { id: "note", ic: "✱", live: 1, title: "Add a note to a feature…", words: "note voice memo remember jot comment", steps: ["feature"], run: ([f]) => ACT.note(f) },
+  { id: "idea", ic: "✦", live: 1, title: "Capture an idea…", words: "idea ideation capture new idea thought", steps: ["project"], run: ([p]) => ACT.idea(p) },
+  { id: "brainstorm", ic: "✦", live: 1, title: "Brainstorm with Claude…", words: "brainstorm ideation idea think explore start ideation", steps: ["project", "text?:Topic (optional)"], run: ([p, t]) => ACT.claude("brainstorm", p, null, t) },
+  { id: "ask", ic: "▶", live: 1, title: "Ask Claude to do something…", words: "ask claude session new prompt task", steps: ["project", "text:What should Claude do?"], run: ([p, t]) => ACT.claude("ask", p, null, t) },
+  { id: "next", ic: "➜", title: "Next steps from the handoff…", words: "next steps whats next what should i do todo handoff", steps: ["project", "nextstep"],
+    run: ([p, s]) => SERVER ? ACT.claude("ask", p, null, s) : ACT.go(projectPage(p).href + "#handoff") },
+  { id: "bystatus", ic: "≡", title: "Show features by status…", words: "show list filter status in progress done planned parked", steps: ["status", "feature"], run: ([, f]) => ACT.go(f.href) },
+  { id: "resume", ic: "↻", live: 1, title: "Resume a session…", words: "resume continue session reopen", steps: ["session"], run: ([s]) => ACT.resume(s) },
+  { id: "resume-last", ic: "↻", live: 1, title: "Resume the last session", words: "resume continue last latest session", steps: [], run: () => { const s = lastSession(); s ? ACT.resume(s) : toast("No logged session to resume.", true); } },
+  { id: "stop", ic: "■", live: 1, title: "Stop a running session…", words: "stop kill cancel run", steps: ["run"], run: ([r]) => ACT.stop(r.run) },
+  { id: "explorer", ic: "▤", live: 1, title: "Open a project folder in Explorer…", words: "open folder explorer files directory", steps: ["project"], run: ([p]) => ACT.open(p, "explorer") },
+  { id: "code", ic: "▤", live: 1, title: "Open a project in VS Code…", words: "open vs code vscode editor code", steps: ["project"], run: ([p]) => ACT.open(p, "code") },
+  { id: "home", ic: "⌂", title: "Go home", words: "home start overview all projects", steps: [], run: () => ACT.go("index.html") },
+  { id: "media", ic: "▣", title: "Screenshots and video", words: "media screenshots video gallery images", steps: [], run: () => ACT.go("media") },
+  { id: "timeline", ic: "≡", title: "Timeline of sessions", words: "timeline history sessions recent", steps: [], run: () => ACT.tab("timeline") },
+  { id: "runs", ic: "▶", live: 1, title: "Runs: sessions started from here", words: "runs running launched sessions agents", steps: [], run: () => ACT.tab("runs") },
+  { id: "newer", ic: "›", title: "Next (newer) session", words: "next newer session", steps: [], run: () => { closePalette(); step(1); } },
+  { id: "older", ic: "‹", title: "Previous (older) session", words: "previous prev older session", steps: [], run: () => { closePalette(); step(-1); } },
+  { id: "refresh", ic: "⟳", live: 1, title: "Refresh all pages", words: "refresh rerender rebuild reload update pages", steps: [], run: async () => { closePalette(); await api("/api/render", {}); await refresh(true); toast("Pages rebuilt."); } },
+  { id: "login", ic: "⚿", live: 1, title: "Log in to Claude Code", words: "login log in sign in auth claude", steps: [], run: async () => { closePalette(); await api("/api/login", {}); toast("A terminal window opened: sign in there."); } },
+  { id: "help", ic: "?", title: "What can I say?", words: "help commands examples voice what can i say", steps: ["example"], run: ([ex]) => { pal.flow = null; $("#pal-q").value = ex; renderPalette(); } },
+];
+const EXAMPLES = [
+  "brainstorm procedural map generation in Forge", "start ideation in Extraction Game", "new feature terrain painter in Forge",
+  "describe the map stage", "write a description for game export", "plan slice 7", "mark slice 4 in progress", "mark this done",
+  "move voice under generation engine", "run the asset stages", "add a note to render farm", "what's next in Forge",
+  "show in progress features", "resume the last session", "ask Claude to fix the failing thumbnail test in Forge",
+  "open Forge in VS Code", "go to the Forge handoff", "screenshots", "next session", "stop the running session",
+];
+const tplOk = (t) => SERVER || !t.live;
+
+// Parse a phrase (typed or spoken) into concrete, ready-to-run actions.
+function intents(raw) {
+  const t = norm(raw), out = [];
+  if (!t) return out;
+  const add = (o) => out.push(o);
+  const featureFrom = (s) => (!s || /^(it|this|this feature|that|the feature)$/.test(s)) ? (ctxFeature() ? { p: ctxFeature(), s: 90 } : null) : best(s.replace(/^the\s+/, ""), ["feature"], { min: 45 });
+  let m;
+
+  // status: "mark map stage done", "set slice 4 to in progress", "this is done", "render farm is finished"
+  if ((m = t.match(new RegExp(`^(?:(mark|set|make|flag|move)\\s+)?(.*?)\\s*(?:\\b(?:as|to|is|status)\\b\\s*)?${STATUS_TAIL}$`)))) {
+    const verb = !!m[1] || /\b(is|as|to)\s+\S+$/.test(t) || /\bis\s+(in progress|on hold)$/.test(t);
+    const ent = featureFrom(m[2].replace(/\s*\b(as|to|is|status)$/, ""));
+    const st = statusOf(m[3]);
+    if (ent && st && (verb || ent.s >= 80) && !/^(brainstorm|new|add|create|capture|start ideation)/.test(t))
+      add({ ic: "●", title: `Mark ${label(ent.p)} as ${st}`, sub: `${ent.p.project} · now ${ent.p.status || "no status"}`, s: 60 + ent.s * 0.4, live: 1, run: () => ACT.status(ent.p, st) });
+  }
+  // ideation: "brainstorm X in Forge", "start ideation", "new idea about ...", "I have an idea ..."
+  if ((m = t.match(/^(?:(?:i\s+have|lets|let s|start|begin|new|add|capture|record|have)\s+(?:an?\s+|some\s+)?)?(ideation|ideas|idea|brainstorming|brainstorm)\b(?:\s+session)?(?:\s+(?:about|on|for|around|regarding|with claude))?\s*(.*)$/))) {
+    const { rest, project } = splitProject(m[2]);
+    const proj = project || ctxProject(), topic = rest.replace(/^(about|on|for)\s+/, "");
+    const rawTopic = topic ? rawTail(raw, /^.*?\b(?:ideation|ideas|idea|brainstorming|brainstorm)\b(?:\s+session)?(?:\s+(?:about|on|for|around|regarding|with claude))?\s*/i).replace(new RegExp(`\\s*\\b(?:in|for|on)\\s+(?:the\\s+)?${(project || "§").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s+project)?\\s*$`, "i"), "") : "";
+    const brain = /brainstorm|ideation/.test(m[1]);
+    add({ ic: "✦", title: `Brainstorm with Claude${topic ? `: ${rawTopic || topic}` : ""}`, sub: `${proj} · a conversation that ends in an ideation doc`, s: brain ? 95 : 84, live: 1, run: () => ACT.claude("brainstorm", proj, null, rawTopic || topic) });
+    add({ ic: "✦", title: `Capture an idea${topic ? `: ${rawTopic || topic}` : ""}`, sub: `${proj} · saved as a new ideation doc`, s: brain ? 84 : 93, live: 1, run: () => ACT.idea(proj, rawTopic || "") });
+  }
+  // new feature / group: "new feature terrain painter in Forge", "create a group called combat", "add slice boss fight under combat"
+  if ((m = t.match(/^(?:new|add|create|make)\s+(?:a\s+|an\s+)?(feature group|group|feature|slice|epic)\s*(?:called|named)?\s*(.*)$/))) {
+    const isGroup = /group|epic/.test(m[1]);
+    let { rest, project } = splitProject(m[2]);
+    let parent = null, g;
+    if ((g = rest.match(/^(.*?)\s+(?:under|in group|inside|into|in|as part of|part of)\s+(.+)$/))) {
+      const e = best(g[2], ["feature"], { min: 55, project: project || undefined });
+      if (e) { parent = e.p; rest = g[1]; project = project || e.p.project; }
+    }
+    const proj = project || ctxProject();
+    const name = rawTail(raw, /^.*?\b(?:feature group|group|feature|slice|epic)\b\s*(?:called|named)?\s*/i)
+      .replace(/\s+\b(?:in|for|under|inside|into|as part of|part of)\b.*$/i, "").trim() || rest;
+    if (name) add({ ic: "+", title: `New ${isGroup ? "feature group" : "feature"}: ${name.replace(/^./, (c) => c.toUpperCase())}`, sub: `${proj}${parent ? " · under " + parent.title : ""}${isGroup ? "" : " · then describe it"}`, s: 96, live: 1,
+      run: () => ACT.newFeature(proj, name.replace(/^./, (c) => c.toUpperCase()), parent ? parent.slug : "", isGroup) });
+    else add({ ic: "+", title: `New ${isGroup ? "feature group" : "feature"}…`, sub: proj, s: 90, live: 1, flow: { tpl: isGroup ? "newgroup" : "newfeat", args: [proj] } });
+  }
+  // describe: "describe map stage", "write a description for game export", "start working on a description for voice"
+  if ((m = t.match(/^(?:describe|define|spec(?:\s+out)?|(?:(?:start|begin)\s+(?:working\s+on\s+|writing\s+)?)?(?:write|draft|work\s+on)?\s*(?:up\s+)?(?:a\s+|the\s+)?(?:description|spec|summary)\s+(?:for|of))\s*(.*)$/))) {
+    const ent = featureFrom(m[1]);
+    if (ent) {
+      add({ ic: "✎", title: `Describe ${label(ent.p)}`, sub: `${ent.p.project} · write the summary and what it is (type or speak)`, s: 92, live: 1, run: () => ACT.describe(ent.p) });
+      add({ ic: "✎", title: `Work out ${label(ent.p)}'s description with Claude`, sub: "Claude interviews you, then writes it", s: 86, live: 1, run: () => ACT.claude("describe", ent.p.project, ent.p) });
+    }
+  }
+  // plan: "plan slice 7", "make a plan for game export"
+  if ((m = t.match(/^(?:plan|(?:write|make|draft)\s+(?:a\s+|the\s+)?plan\s+(?:for|of))\s+(.+?)(?:\s+with claude)?$/))) {
+    const ent = featureFrom(m[1]);
+    if (ent) add({ ic: "☰", title: `Plan ${label(ent.p)} with Claude`, sub: `${ent.p.project} · writes devlog/planning, no code`, s: 92, live: 1, run: () => ACT.claude("plan", ent.p.project, ent.p) });
+  }
+  // run: "run the asset stages", "start working on slice 4", "implement game export"
+  if ((m = t.match(/^(?:run|start(?:\s+working\s+on)?|work\s+on|implement|build|continue(?:\s+working\s+on)?|kick\s+off|do)\s+(.+?)(?:\s+(?:in|with)\s+claude)?$/)) && !/idea|ideation|brainstorm|description|spec/.test(m[1])) {
+    const ent = featureFrom(m[1]);
+    if (ent) add({ ic: "▶", title: `Run ${label(ent.p)} in Claude`, sub: `${ent.p.project} · ${ent.p.group ? "works through its unfinished members" : "status " + (ent.p.status || "none")}`, s: 60 + ent.s * 0.35, live: 1, run: () => ACT.run(ent.p) });
+  }
+  // move: "move voice under generation engine", "ungroup voice"
+  if ((m = t.match(/^(?:move|put|group)\s+(.+?)\s+(?:under|into|in|to|inside)\s+(.+)$/)) && !statusOf(m[2])) {
+    const a = featureFrom(m[1]), b = best(m[2], ["feature"], { min: 50 });
+    if (a && b && a.p.slug !== b.p.slug) add({ ic: "↳", title: `Move ${a.p.title} into ${b.p.title}`, sub: a.p.project, s: 90, live: 1, run: () => ACT.move(a.p, b.p.slug) });
+  }
+  if ((m = t.match(/^ungroup\s+(.+)$/))) { const a = featureFrom(m[1]); if (a) add({ ic: "↳", title: `Take ${a.p.title} out of its group`, sub: a.p.project, s: 90, live: 1, run: () => ACT.move(a.p, "") }); }
+  // notes: "add a note to render farm", "note the planner should cache seeds"
+  if ((m = t.match(/^(?:add\s+(?:a\s+)?)?(?:voice\s+)?note(?:s)?(?:\s+(?:to|on|for)\s+(.+))?$/))) {
+    const ent = featureFrom(m[1] || "");
+    if (ent) add({ ic: "✱", title: `Add a note to ${label(ent.p)}`, sub: `${ent.p.project} · speak or type it`, s: 92, live: 1, run: () => ACT.note(ent.p) });
+  } else if ((m = t.match(/^(?:note|remember|jot down)\s+(?:that\s+)?(.+)$/)) && ctxFeature()) {
+    const text = rawTail(raw, /^\s*(?:note|remember|jot down)[:,]?\s*(?:that\s+)?/i);
+    add({ ic: "✱", title: `Note on ${ctxFeature().title}: “${text}”`, sub: "saved into its Notes", s: 88, live: 1, run: () => ACT.note(ctxFeature(), text) });
+  }
+  // resume
+  if (/^(?:resume|continue|reopen)\s+(?:the\s+)?(?:last|latest|previous|most recent)\s+session$/.test(t)) {
+    const s = lastSession();
+    if (s) add({ ic: "↻", title: `Resume ${s.title}`, sub: `${s.project} · ${fmtTime(s.started)}`, s: 96, live: 1, run: () => ACT.resume(s) });
+  } else if ((m = t.match(/^(?:resume|reopen)\s+(.+)$/))) {
+    const e = best(m[1], ["session"], { min: 45 });
+    if (e) add({ ic: "↻", title: `Resume ${e.p.title}`, sub: `${e.p.project} · ${fmtTime(e.p.started)}`, s: 90, live: 1, run: () => ACT.resume(e.p) });
+  }
+  // ask Claude: "ask claude to ...", "hey claude ..."
+  if ((m = t.match(/^(?:ask claude|hey claude|claude|ask)\s+(?:to\s+)?(.+)$/))) {
+    const { project } = splitProject(m[1]);
+    const text = rawTail(raw, /^\s*(?:ask claude|hey claude|claude|ask)[,:]?\s*(?:to\s+)?/i);
+    add({ ic: "▶", title: `Ask Claude: “${text}”`, sub: `${project || ctxProject()} · new session`, s: 94, live: 1, run: () => ACT.claude("ask", project || ctxProject(), null, text) });
+  }
+  // next steps: "what's next in forge", "next steps"
+  if ((m = t.match(/^(?:whats\s+next|what\s+is\s+next|next\s+steps?|what\s+should\s+i\s+(?:do|work\s+on)(?:\s+next)?|todo)(?:\s+(?:in|for|on)\s+(.+))?$/))) {
+    const e = m[1] ? best(m[1], ["project"], { min: 50 }) : null;
+    const proj = e ? e.p.project : ctxProject();
+    add({ ic: "➜", title: `Next steps in ${proj}`, sub: "from its handoff; pick one to run it", s: 96, flow: { tpl: "next", args: [proj] } });
+  }
+  // filter: "show in progress features", "list planned features in forge"
+  if ((m = t.match(/^(?:show|list|find)\s+(?:me\s+)?(?:all\s+)?(?:the\s+)?(done|finished|in progress|active|started|planned|todo|parked|ideas?)\s*(?:features)?(?:\s+(?:in|for)\s+(.+))?$/))) {
+    const st = statusOf(m[1]);
+    if (st) add({ ic: "≡", title: `Features ${st === "idea" ? "at idea stage" : st}`, sub: "pick one to open it", s: 95, flow: { tpl: "bystatus", args: [st] } });
+  }
+  // open in an app: "open forge in vs code", "open the forge folder"
+  if ((m = t.match(/^open\s+(?:the\s+)?(.+?)\s+(?:in|with)\s+(explorer|file explorer|files|folder|vs\s*code|vscode|code|visual studio code)$/)) || (m = t.match(/^open\s+(?:the\s+)?(.+?)\s+(folder)$/))) {
+    const e = best(m[1], ["project"], { min: 50 });
+    if (e) { const app = /code/.test(m[2]) ? "code" : "explorer"; add({ ic: "▤", title: `Open ${e.p.project} in ${app === "code" ? "VS Code" : "Explorer"}`, sub: "", s: 96, live: 1, run: () => ACT.open(e.p.project, app) }); }
+  }
+  // stop a run
+  if ((m = t.match(/^(?:stop|kill|cancel)\s+(.+)$/))) {
+    const active = runPages().filter((r) => ACTIVE.includes(r.state));
+    const e = /^(the\s+)?(running\s+)?(session|run)$/.test(m[1]) && active.length === 1 ? { p: active[0] } : best(m[1], ["run"], { min: 45, filter: (r) => ACTIVE.includes(r.state) });
+    if (e) add({ ic: "■", title: `Stop ${e.p.title}`, sub: STATE_LABEL[e.p.state] || e.p.state, s: 92, live: 1, run: () => ACT.stop(e.p.run) });
+  }
+  // navigation: "go to the forge handoff", "open slice 3", "screenshots", "next session"
+  if ((m = t.match(/^(?:go\s+to|go|open|show(?:\s+me)?|navigate\s+to|take\s+me\s+to|jump\s+to|view)\s+(?:the\s+)?(.+)$/)) || !VERBS.test(t)) {
+    const target = m ? m[1] : t;
+    const spec = target.match(/^(?:(.+?)\s+)?(handoff|plans?|planning|overview|ideation|ideas)(?:\s+(?:of|for|in)\s+(.+))?$/);
+    if (spec) {
+      const named = spec[1] || spec[3] || "";
+      const e = named ? best(named, ["project"], { min: 50 }) : null;
+      const proj = e ? e.p.project : ctxProject();
+      const anchor = spec[2] === "handoff" ? "#handoff" : "#docs";
+      // only go there by itself when every name in the phrase was understood
+      add({ ic: "→", title: `${proj}: ${spec[2]}`, sub: named && !e ? `go · “${named}” is not a project I know` : "go", s: named && !e ? 70 : 97, auto: !named || !!e,
+            run: () => ACT.go(projectPage(proj).href + anchor) });
+    }
+    const special = { home: "home", media: "media", screenshots: "media", videos: "media", gallery: "media", timeline: "timeline", runs: "runs" };
+    for (const [w, id] of Object.entries(special)) if (target === w || target === w + " page") { const tp = TPL.find((x) => x.id === id); if (tplOk(tp)) add({ ic: tp.ic, title: tp.title, sub: "go", s: 97, auto: 1, run: tp.run }); }
+    for (const e of ranked(target, ["project", "feature", "session"], { min: m ? 55 : 60 }).slice(0, 4))
+      add({ ic: "→", title: label(e.p), sub: `${e.p.kind}${e.p.kind !== "project" ? " · " + e.p.project : ""}`, s: Math.min(95, e.s - (m ? 0 : 4)), auto: e.s >= 90 && !!m, run: () => ACT.go(e.p.href) });
+  }
+  if (/^(?:next|newer)\s+session$/.test(t)) add({ ic: "›", title: "Next (newer) session", sub: "", s: 97, auto: 1, run: () => { closePalette(); step(1); } });
+  if (/^(?:previous|prev|older)\s+session$/.test(t)) add({ ic: "‹", title: "Previous (older) session", sub: "", s: 97, auto: 1, run: () => { closePalette(); step(-1); } });
+  if (/^(?:latest|newest|last)\s+session$/.test(t) && sessions.length) { const s = sessions[sessions.length - 1]; add({ ic: "→", title: s.title, sub: "latest session", s: 96, auto: 1, run: () => ACT.go(s.href) }); }
+  return out.filter((o) => SERVER || !o.live).sort((a, b) => b.s - a.s);
+}
+
+// Actions for the page you are on, shown when the palette opens empty.
+function contextActions() {
+  const out = [], f = ctxFeature(), c = current;
+  if (f && SERVER) {
+    for (const st of (f.status === "done" ? ["in-progress"] : f.status === "in-progress" ? ["done", "parked"] : ["in-progress", "done"]))
+      out.push({ ic: "●", title: `Mark ${f.title} as ${st}`, sub: `now ${f.status || "no status"}`, run: () => ACT.status(f, st) });
+    out.push({ ic: "▶", title: `Run ${f.title} in Claude`, sub: f.group ? "works through its unfinished members" : "", run: () => ACT.run(f) });
+    out.push({ ic: "✎", title: `Describe ${f.title}`, sub: "summary and what it is", run: () => ACT.describe(f) });
+    out.push({ ic: "☰", title: `Plan ${f.title} with Claude`, sub: "", run: () => ACT.claude("plan", f.project, f) });
+    out.push({ ic: "✱", title: `Add a note to ${f.title}`, sub: "speak or type", run: () => ACT.note(f) });
+    out.push({ ic: "+", title: `New feature under ${f.group ? f.title : (pages.find((p) => p.kind === "feature" && p.slug === f.parent && p.project === f.project) || {}).title || f.project}`, sub: f.project,
+      run: () => { pal.flow = { tpl: TPL.find((t) => t.id === "newfeat"), args: [f.project], i: 1 }; if (f.group) pal.flow.preset = { 2: f.slug }; else if (f.parent) pal.flow.preset = { 2: f.parent }; $("#pal-q").value = ""; renderPalette(); } });
+  } else if (c && c.kind === "session" && SERVER && (c.session_ids || []).length) {
+    out.push({ ic: "↻", title: `Resume ${c.title}`, sub: "continue that conversation", run: () => ACT.resume(c) });
+  }
+  const proj = ctxProject();
+  if (SERVER) {
+    out.push({ ic: "✦", title: `Brainstorm with Claude in ${proj}`, sub: "start ideation", run: () => { pal.flow = { tpl: TPL.find((t) => t.id === "brainstorm"), args: [proj], i: 1 }; $("#pal-q").value = ""; renderPalette(); } });
+    out.push({ ic: "✦", title: `Capture an idea in ${proj}`, sub: "speak or type; saved to ideation", run: () => ACT.idea(proj) });
+    if (!f) out.push({ ic: "+", title: `New feature in ${proj}…`, sub: "then describe it", run: () => { pal.flow = { tpl: TPL.find((t) => t.id === "newfeat"), args: [proj], i: 1 }; $("#pal-q").value = ""; renderPalette(); } });
+  }
+  return out;
+}
+
+// Choices for a step of a command.
+function stepChoices(kind, q, flow) {
+  const proj = flow && typeof flow.args[0] === "string" && DATA.projects.some((p) => p.name === flow.args[0]) ? flow.args[0] : null;
+  const ent = (p, extra = {}) => ({ ic: { feature: "◆", session: "◷", project: "▣", run: "▶" }[p.kind] || "→", title: label(p), sub: p.kind === "feature" ? `${p.project} · ${p.status || "no status"}${p.group ? " · group" : ""}` : p.kind === "session" ? `${p.project} · ${fmtTime(p.started)}` : p.kind === "run" ? (STATE_LABEL[p.state] || p.state) : p.summary || "", value: p, ...extra });
+  if (kind === "page") return ranked(q, ["project", "feature", "session"], { min: 35 }).slice(0, 40).map((x) => ent(x.p));
+  if (kind === "feature") {
+    const st = flow && flow.tpl.id === "bystatus" ? flow.args[0] : null;
+    const list = ranked(q, ["feature"], { min: 35, project: flow && flow.tpl.id !== "bystatus" ? proj : undefined, filter: st ? (p) => p.status === st : null });
+    const cf = ctxFeature();
+    if (cf && !q && list.some((x) => x.p === cf)) list.sort((a, b) => (b.p === cf) - (a.p === cf));
+    return list.slice(0, 60).map((x) => ent(x.p));
+  }
+  if (kind === "group") {
+    const own = flow && flow.args[0] && typeof flow.args[0] === "object" ? flow.args[0] : null;
+    const list = ranked(q, ["feature"], { min: 35, project: own ? own.project : proj, filter: (p) => !own || p.slug !== own.slug })
+      .sort((a, b) => (b.p.group - a.p.group) || (b.s - a.s));
+    return [{ ic: "○", title: "No group", sub: "top level", value: "" }].concat(list.slice(0, 40).map((x) => ent(x.p, { value: x.p.slug })));
+  }
+  if (kind === "project") {
+    const names = DATA.projects.map((p) => p.name), cp = ctxProject();
+    return names.sort((a, b) => (b === cp) - (a === cp)).filter((n) => !q || score(q, { kind: "project", title: n, project: n }) >= 35)
+      .map((n) => ({ ic: "▣", title: n, sub: n === cp ? "current project" : "", value: n }));
+  }
+  if (kind === "status") return META.statuses.concat(META.statuses.length ? [] : ["idea", "planned", "in-progress", "done", "parked"])
+    .filter((s) => !q || norm(s).includes(norm(q)) || statusOf(q) === s).map((s) => ({ ic: "●", title: s, sub: "", value: s, dot: s }));
+  if (kind === "session") return ranked(q, ["session"], { min: 35, filter: (s) => (s.session_ids || []).length }).sort((a, b) => q ? 0 : (b.p.started || "").localeCompare(a.p.started || "")).slice(0, 40).map((x) => ent(x.p));
+  if (kind === "run") return ranked(q, ["run"], { min: 30, filter: (r) => ACTIVE.includes(r.state) }).map((x) => ent(x.p));
+  if (kind === "nextstep") {
+    const p = projectPage(proj);
+    return (p && p.next_steps || []).filter((s) => !q || norm(s).includes(norm(q))).map((s) => ({ ic: "➜", title: s, sub: SERVER ? "run it in Claude" : "open the handoff", value: s }));
+  }
+  if (kind === "example") return EXAMPLES.filter((x) => !q || norm(x).includes(norm(q))).map((x) => ({ ic: "“", title: x, sub: "try it", value: x }));
+  return [];
+}
+
+function openPalette(text = "", voice = false) {
+  if (document.querySelector("dialog[open]")) return;
+  pal.open = true; pal.flow = null; pal.sel = 0; pal.voice = false;
+  $("#pal").hidden = false;
+  $("#pal-q").value = text;
+  $("#pal-q").focus();
+  renderPalette();
+  if (voice && document.body.classList.contains("stt")) micStart(document.querySelector('[data-mic="#pal-q"]'));
+}
+function closePalette() {
+  if (mic.rec && mic.field && mic.field.id === "pal-q") micStop(true);
+  pal.open = false; pal.flow = null;
+  $("#pal").hidden = true;
+}
+function startFlow(tpl, args = []) {
+  pal.flow = { tpl, args: [...args], i: args.length };
+  $("#pal-q").value = "";
+  advanceFlow();
+}
+function advanceFlow() {
+  const fl = pal.flow;
+  while (fl.preset && fl.preset[fl.i] !== undefined && fl.i < fl.tpl.steps.length) { fl.args[fl.i] = fl.preset[fl.i]; fl.i++; }
+  if (fl.i >= fl.tpl.steps.length) { const t = fl.tpl, a = fl.args; pal.flow = null; t.run(a); return; }
+  renderPalette();
+}
+function choose(item) {
+  if (!item) return;
+  if (item.tpl) return startFlow(item.tpl, item.args || []);
+  if (item.flow) return startFlow(TPL.find((t) => t.id === item.flow.tpl), item.flow.args);
+  if (pal.flow && "value" in item) { pal.flow.args[pal.flow.i++] = item.value; $("#pal-q").value = ""; return advanceFlow(); }
+  if (item.run) { const r = item.run; if (!item.keepOpen) pal.flow = null; r(); }
+}
+function renderPalette() {
+  if (!pal.open) return;
+  const q = $("#pal-q").value, fl = pal.flow;
+  const secs = [];
+  if (fl) {
+    const spec = fl.tpl.steps[fl.i], [kind, prompt] = spec.split(":"), optional = kind.endsWith("?"), k = kind.replace("?", "");
+    $("#pal-crumb").innerHTML = `<span>${esc(fl.tpl.title.replace("…", ""))}</span>` + fl.args.map((a) => `<span>${esc(typeof a === "object" && a ? a.title : (a === "" ? "none" : a))}</span>`).join("");
+    $("#pal-q").placeholder = prompt || { page: "Which page?", feature: "Which feature?", group: "Which group?", project: "Which project?", status: "Which status?", session: "Which session?", run: "Which run?", nextstep: "Which step?", example: "Pick an example" }[k] || "";
+    if (k === "text") {
+      const v = q.trim();
+      secs.push(["", v ? [{ ic: "↵", title: `Use “${v}”`, sub: "Enter", value: v }] : optional ? [{ ic: "↵", title: "Skip", sub: "leave it empty", value: "" }] : []]);
+      if (!v && !optional) secs.push(["", [{ ic: "", title: "Type or speak it, then press Enter", sub: "", disabled: 1 }]]);
+    } else {
+      const list = stepChoices(k, q, fl);
+      if (optional && k !== "group") list.unshift({ ic: "○", title: "Skip", sub: "", value: "" });
+      secs.push(["", list]);
+    }
+  } else {
+    $("#pal-crumb").innerHTML = "";
+    $("#pal-q").placeholder = SERVER ? "Type or speak: go anywhere, start an idea, describe or run a feature…" : "Go to a project, feature or session…";
+    if (!norm(q)) {
+      secs.push(["For this page", contextActions()]);
+      const p = projectPage(ctxProject());
+      if (p && (p.next_steps || []).length) secs.push([`Next steps in ${p.project}`, p.next_steps.slice(0, 3).map((s) => ({ ic: "➜", title: s, sub: SERVER ? "run it in Claude" : "open the handoff",
+        run: () => SERVER ? ACT.claude("ask", p.project, null, s) : ACT.go(p.href + "#handoff") }))]);
+      secs.push(["Commands", TPL.filter(tplOk).map((t) => ({ ic: t.ic, title: t.title, sub: "", tpl: t }))]);
+    } else {
+      const acts = intents(q);
+      if (acts.length) secs.push(["Best matches", acts.slice(0, 6)]);
+      const words = norm(q).split(" ");
+      const cmds = TPL.filter(tplOk).map((t) => ({ t, s: words.filter((w) => norm(t.words + " " + t.title).split(" ").some((x) => x.startsWith(w))).length / words.length }))
+        .filter((x) => x.s >= 0.5).sort((a, b) => b.s - a.s).slice(0, 5).map((x) => ({ ic: x.t.ic, title: x.t.title, sub: "", tpl: x.t }));
+      if (cmds.length) secs.push(["Commands", cmds]);
+      const shown = new Set(acts.map((a) => a.title));
+      const hits = fullText(q).filter((p) => !shown.has(label(p))).slice(0, 8).map((p) => ({ ic: { feature: "◆", session: "◷", project: "▣" }[p.kind], title: label(p), sub: `${p.kind}${p.kind !== "project" ? " · " + p.project : ""}`, run: () => ACT.go(p.href) }));
+      if (hits.length) secs.push(["Pages mentioning it", hits]);
+      if (SERVER && !(acts[0] && /^Ask Claude/.test(acts[0].title))) secs.push(["Or", [
+        { ic: "▶", title: `Ask Claude: “${q.trim()}”`, sub: `${ctxProject()} · new session`, run: () => ACT.claude("ask", ctxProject(), null, q.trim()) },
+        { ic: "✦", title: `Capture as an idea: “${q.trim()}”`, sub: `${ctxProject()} · ideation doc`, run: () => ACT.idea(ctxProject(), q.trim()) }]]);
+    }
+  }
+  pal.items = [];
+  let html = "";
+  for (const [title, list] of secs) {
+    if (!list.length) continue;
+    if (title) html += `<div class="pal-sec">${esc(title)}</div>`;
+    for (const it of list) {
+      const i = it.disabled ? -1 : pal.items.push(it) - 1;
+      html += `<div class="pal-it${i === pal.sel ? " on" : ""}" ${i >= 0 ? `data-i="${i}" role="option"` : ""}><span class="ic">${it.dot ? `<span class="dot s-${esc(it.dot)}"></span>` : esc(it.ic || "")}</span>`
+        + `<span class="tt">${esc(it.title)}${it.sub ? `<span class="sub">${esc(it.sub)}</span>` : ""}</span>${it.tpl && it.tpl.steps.length ? '<span class="tag">…</span>' : ""}</div>`;
+    }
+  }
+  if (!pal.items.length && !html) html = `<div class="pal-empty">Nothing matches. Try “help” for examples.</div>`;
+  $("#pal-list").innerHTML = html;
+  pal.sel = Math.min(pal.sel, Math.max(0, pal.items.length - 1));
+  const on = $("#pal-list .pal-it.on");
+  if (on) on.scrollIntoView({ block: "nearest" });
+}
+function palMove(d) {
+  if (!pal.items.length) return;
+  pal.sel = (pal.sel + d + pal.items.length) % pal.items.length;
+  $("#pal-list").querySelectorAll(".pal-it[data-i]").forEach((el) => el.classList.toggle("on", +el.dataset.i === pal.sel));
+  const on = $("#pal-list .pal-it.on"); if (on) on.scrollIntoView({ block: "nearest" });
+}
+$("#pal-q").addEventListener("input", () => { pal.sel = 0; renderPalette(); });
+$("#pal-q").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); palMove(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); palMove(-1); }
+  else if (e.key === "Enter") { e.preventDefault(); choose(pal.items[pal.sel]); }
+  else if (e.key === "Tab") {  // fill in: put the selection's words in the box, or step into a command
+    e.preventDefault();
+    const it = pal.items[pal.sel];
+    if (it && (it.tpl || it.flow)) choose(it); else if (it && !pal.flow) { $("#pal-q").value = it.title; renderPalette(); }
+  } else if (e.key === "Escape" && !mic.rec) {
+    e.preventDefault();
+    if (pal.flow) { pal.flow = null; $("#pal-q").value = ""; renderPalette(); } else closePalette();
+  } else if (e.key === "Backspace" && !$("#pal-q").value && pal.flow) {
+    e.preventDefault();
+    if (pal.flow.i > 0 && !(pal.flow.preset && pal.flow.preset[pal.flow.i - 1] !== undefined)) { pal.flow.i--; pal.flow.args.length = pal.flow.i; renderPalette(); } else { pal.flow = null; renderPalette(); }
+  }
+});
+$("#pal-list").addEventListener("mousemove", (e) => { const el = e.target.closest(".pal-it[data-i]"); if (el && +el.dataset.i !== pal.sel) { pal.sel = +el.dataset.i; palMove(0); } });
+$("#pal-list").addEventListener("click", (e) => { const el = e.target.closest(".pal-it[data-i]"); if (el) choose(pal.items[+el.dataset.i]); });
+$("#pal").addEventListener("mousedown", (e) => { if (e.target.id === "pal") closePalette(); });
+// After speaking into the palette: go straight to an obvious place; anything that changes something waits for Enter.
+function palAfterVoice() {
+  pal.voice = true;
+  renderPalette();
+  const top = pal.items[0];
+  if (!pal.flow && top && top.auto && top.s >= 90) setTimeout(() => { if (pal.open && pal.items[0] === top) choose(top); }, 450);
+}
+
+if (SERVER) {
+  document.body.classList.add("live");
+  $("#mode-note").innerHTML = "Right-click a feature to set status · <b>j</b>/<b>k</b> sessions";
+  refresh().catch((e) => toast("devlog server: " + e.message, true));
+  setInterval(() => refresh().catch(() => {}), 5000);
+  setInterval(loadActivity, 3000);
+} else {
+  $("#mode-note").innerHTML = "Read-only. Run <b>Start-Devlog.bat</b> to set status and launch Claude.";
+  if (tab === "runs") tab = "projects";
+}
+setTabs(); renderNav(); route();
+</script>
+</body>
+</html>

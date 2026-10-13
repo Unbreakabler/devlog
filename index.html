@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Game Dev devlog</title><script>(function(){var r=document.documentElement;if(window.parent===window)return;r.classList.add('framed');
+function tell(){try{parent.postMessage({devlog:location.href},'*')}catch(e){}}tell();addEventListener('hashchange',tell);
+addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();parent.postMessage({devlogKey:'palette'},'*');return}
+if(e.ctrlKey||e.metaKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+if(e.key==='j'||e.key==='k'||e.key==='/'){e.preventDefault();parent.postMessage({devlogKey:e.key},'*')}});})();</script><style>
+/* Dark by default; light only when a page sets data-theme=light. */
+:root{--bg:#111113;--fg:#e9e9ee;--muted:#9a9aa5;--card:#1a1a1e;--line:#2b2b32;--accent:#f0875a;--soft:#2c1c14;
+--code:#22222a;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--info:#7aa7ff;color-scheme:dark}
+:root[data-theme=light]{--bg:#f7f6f2;--fg:#1c1c1e;--muted:#6a6a70;--card:#fff;--line:#e4e1d8;--accent:#b4441b;--soft:#fbeee6;
+--code:#f0eee8;--ok:#1d7a3e;--warn:#a35a00;--bad:#b42318;--info:#2559a8;color-scheme:light}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 "Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:28px 16px 96px}
+a{color:var(--accent)}a:hover{text-decoration:none}
+h1{font-size:30px;line-height:1.2;margin:6px 0 10px;letter-spacing:-.01em}
+h2{font-size:19px;margin:40px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:16px;margin:20px 0 6px}h4,h5,h6{font-size:15px;margin:16px 0 4px}
+p{margin:8px 0}ul,ol{margin:6px 0;padding-left:22px}li.sub{margin-left:20px;list-style:circle}
+code{font:13px/1.4 Consolas,"Cascadia Mono",monospace;background:var(--code);padding:1px 5px;border-radius:4px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto}pre code{padding:0;background:none}
+blockquote{margin:10px 0;padding:2px 14px;border-left:3px solid var(--line);color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:600}
+.crumbs{font-size:13px;color:var(--muted)}.crumbs a{color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:13.5px;margin:4px 0 14px}
+.lede{font-size:16.5px;max-width:760px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;background:var(--code);color:var(--muted);white-space:nowrap}
+.b-done{color:var(--ok)}.b-partial,.b-in-progress{color:var(--warn)}.b-blocked,.b-abandoned,.b-fail{color:var(--bad)}.b-pass{color:var(--ok)}
+.b-idea,.b-planned{color:var(--info)}.b-parked,.b-skipped{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:13px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--fg);background:var(--card)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0}
+.prompt{white-space:pre-wrap;font-size:15px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;margin:8px 0;overflow-wrap:anywhere}
+.decision h3{margin:0 0 4px}.decision .choice{font-weight:600}.decision .why{margin:4px 0}.decision .alt{color:var(--muted);font-size:14px}
+.by{font-size:12px;color:var(--muted);float:right;margin-left:10px}
+.timeline{list-style:none;padding:0;margin:0;border-left:2px solid var(--line)}
+.timeline>li{position:relative;padding:2px 0 14px 18px}.timeline>li:before{content:"";position:absolute;left:-6px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.timeline .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-right:6px}
+.timeline .when{font-size:12px;color:var(--muted)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:10px 0}
+figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+figure img,figure video{display:block;width:100%;height:auto;background:#000;max-height:520px;object-fit:contain}
+figcaption{font-size:13.5px;padding:8px 10px;color:var(--fg)}figcaption .f{color:var(--muted);font-size:12px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.thumbs img,.thumbs video{width:120px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:#000}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.grid .card{margin:0}.card h3{margin:0 0 4px}.small{font-size:13px;color:var(--muted)}
+details{margin:8px 0}summary{cursor:pointer;color:var(--muted);font-size:14px}
+.files{columns:2 320px;font:12.5px/1.6 Consolas,monospace;color:var(--muted);padding-left:18px}
+.msg{border-left:3px solid var(--line);padding:2px 12px;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{color:var(--muted);font-style:italic}
+dialog{border:0;padding:0;background:transparent;max-width:96vw;max-height:96vh}dialog::backdrop{background:rgba(0,0,0,.85)}
+dialog img{max-width:96vw;max-height:92vh;display:block}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:7px;vertical-align:1px}
+.s-done{background:var(--ok)}.s-in-progress,.s-partial{background:var(--warn)}.s-planned,.s-idea{background:var(--info)}.s-blocked,.s-abandoned{background:var(--bad)}
+.tag{font-size:12px;padding:1px 8px;margin-left:4px;border-radius:999px;background:var(--code);color:var(--muted);text-decoration:none;white-space:nowrap}
+.tag:hover{color:var(--fg)}
+.card.group{border-left:3px solid var(--accent)}
+.fchildren{list-style:none;padding:0;margin:10px 0 0;border-top:1px solid var(--line)}
+.fchildren li{padding:7px 0;border-bottom:1px solid var(--line)}.fchildren li:last-child{border-bottom:0}
+.fchildren .small{margin-left:15px}
+.subs{margin-top:10px}
+details.sub{border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin:8px 0;background:var(--bg)}
+details.sub>summary{color:var(--fg);padding:2px 0}details.sub[open]>summary{margin-bottom:6px}
+@media (max-width:600px){h1{font-size:24px}.by{float:none;display:block}}
+.browse{position:fixed;top:12px;right:14px;font-size:12.5px;padding:4px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--fg);text-decoration:none;z-index:3}.browse:hover{border-color:var(--accent)}.framed .browse{display:none}@media (max-width:600px){.browse{position:static;display:inline-block;margin-bottom:8px}}</style></head><body><a class="browse" href="browse.html#/index.html">Browse all ›</a><main><div class="crumbs">Game Dev</div><h1>Game Dev devlog</h1><p class="lede">Every Claude session across the workspace: what was asked, what was decided, what got built, with screenshots and video. Each project page also tracks features from idea to done.</p><h2>Projects</h2><div class="grid"><div class="card"><h3><a href="workspace.html">Workspace</a></h3><div class="small">1 sessions · 1 features · last 13 Oct</div><p>The shared side of <code>D:\Game Dev</code>: the two-PC asset pipeline (concept to 3D to export), ComfyUI and its MCP, machine setup scripts, the engines, and the conventions that apply to every project, including this devlog framework.</p></div><div class="card"><h3><a href="../Extraction%20Game/devlog/index.html">Extraction Game</a></h3><div class="small">0 sessions · 0 features</div><p>An extraction game, not started yet: the folder is an empty Git repository with LFS configured by <code>Setup\Setup-Workstation.ps1</code>, waiting for its first ideation and engine choice.</p></div><div class="card"><h3><a href="../Forge/devlog/index.html">Forge</a></h3><div class="small">1 sessions · 13 features · 1 in progress · last 13 Oct</div><p>Forge is a Windows desktop app that drives ComfyUI on both of Jon's PCs (RTX 5080 workstation, RTX 4080 Super generation node) as a small render farm and turns prompts into game assets: map, concept art, isolated asset images, then textured, game-ready 3D models, with voice prompts later. It is…</p></div></div><h2>Recent sessions</h2><div class="tablewrap"><table><thead><tr><th>Date</th><th>Project</th><th>Session</th><th>Outcome</th></tr></thead><tbody><tr><td>2026-10-13</td><td>Workspace</td><td><a href="./sessions/2026-10-13-devlog-framework/index.html">Devlog framework, browser, dev tool, dictation and command palette</a></td><td><span class="badge b-done">done</span></td></tr><tr><td>2026-10-12</td><td>Forge</td><td><a href="../Forge/devlog/sessions/2026-10-12-slice-3-both-gpus/index.html">Slice 3: both GPUs</a></td><td><span class="badge b-partial">partial</span></td></tr></tbody></table></div><p class="small" style="margin-top:40px">Generated by devlog.py · 2026-10-13 01:31</p></main><dialog id=z onclick="this.close()"><img id=zi alt=""></dialog><script>
+document.addEventListener('click',e=>{const a=e.target.closest('a.zoom');if(!a)return;e.preventDefault();
+document.getElementById('zi').src=a.href;document.getElementById('z').showModal();});
+function openTarget(){var t=location.hash&&document.getElementById(decodeURIComponent(location.hash.slice(1)));if(!t)return;
+for(var e=t;e;e=e.parentElement)if(e.tagName==='DETAILS')e.open=true;t.scrollIntoView();}
+addEventListener('hashchange',openTarget);openTarget();</script></body></html>
