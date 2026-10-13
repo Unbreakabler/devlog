@@ -1,6 +1,6 @@
 # How to use the devlog corpus (for agents)
 
-Every project under `D:\Game Dev` records its history in a `devlog/` folder: why it exists, what was planned, what each feature is and how it was built, decisions and the reasons for them, and where the last agent stopped. This guide says how to read it efficiently. How to *write* it is in the `devlog` skill (`D:\Game Dev\.claude\skills\devlog\SKILL.md`).
+Every project under `D:\Game Dev` records its history in a `devlog/` folder: why it exists, what was planned, what each feature is and how it was built, decisions and the reasons for them, and where the last agent stopped. This guide says how to read it efficiently. How to *write* it is in the `devlog` skill (`D:\Game Dev\devlog\skill\SKILL.md`).
 
 ## Where the corpora are
 

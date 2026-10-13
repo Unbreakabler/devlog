@@ -1,0 +1,6 @@
+# Machine-local state written by the devlog server and the Stop hook
+runs/
+.skipped.json
+# Python bytecode from the skill's scripts
+__pycache__/
+*.pyc

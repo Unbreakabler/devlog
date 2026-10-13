@@ -16,7 +16,7 @@ Workstation (jon-gaming, RTX 5080) and generation node (RTX 4080 Super, mapped a
 ## Where things live
 
 - Rules for agents in every project: `CLAUDE.md` (this folder).
-- devlog skill, scripts and templates: `.claude\skills\devlog\` (also linked at `%USERPROFILE%\.claude\skills\devlog`); Stop hook in `%USERPROFILE%\.claude\settings.json`.
+- devlog skill, scripts and templates: `devlog\skill\` (also linked at `%USERPROFILE%\.claude\skills\devlog`); Stop hook in `%USERPROFILE%\.claude\settings.json`.
 - Corpus guide: `devlog\GUIDE.md`. Browser over every page: `devlog\browse.html`. Home page across projects: `devlog\index.html`; this project's page: `devlog\workspace.html`.
 
 ## Conventions

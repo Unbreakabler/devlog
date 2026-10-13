@@ -156,6 +156,15 @@
       "choice": "Only navigation where every name was understood runs by itself; anything that changes files or starts a session is highlighted and waits for Enter.",
       "why": "A mis-heard command should never change the devlog or launch Claude. A test where Whisper heard the phrase twice auto-navigated to the wrong project before this rule.",
       "by": "agent"
+    },
+    {
+      "title": "Where does the skill live now that the devlog has its own repo?",
+      "choice": "In the repo as `devlog\\skill\\`, linked into `%USERPROFILE%\\.claude\\skills\\devlog`; `devlog.py install` sets up the link and the Stop hook on any PC.",
+      "why": "Jon wanted the devlog project and the skill in one repo. A visible `skill/` folder keeps the tool and the workspace's own log side by side; the user-level link keeps the skill available from every project folder.",
+      "alternatives": [
+        "`devlog/.claude/skills/devlog` (only picked up when Claude starts inside the devlog folder)"
+      ],
+      "by": "user"
     }
   ],
   "timeline": [
@@ -397,6 +406,22 @@
       "media": [
         "media/palette-voice.png"
       ]
+    },
+    {
+      "kind": "step",
+      "text": "Moved the skill into the devlog repo as `skill/`, re-pointed the user-level link and the Stop hook, and updated every path reference (CLAUDE.md, Start-Devlog.bat, GUIDE, OVERVIEW, SKILL.md, capture recipes)."
+    },
+    {
+      "kind": "fix",
+      "text": "The hook's corpus check treated anything under a `devlog` folder as logging; it now excludes the skill folder, so editing the tool still counts as work."
+    },
+    {
+      "kind": "step",
+      "text": "Added `devlog.py install` (link plus hook, idempotent, updates an older path), a `.gitignore` for machine-local state, and a README for the repo."
+    },
+    {
+      "kind": "test",
+      "text": "From the new location: install reported both already correct, render, the Stop hook, the server, the palette and dictation all work; scripts are not served over HTTP."
     }
   ],
   "media": [
@@ -581,11 +606,17 @@
       "what": "Spoken commands through a fake mic (navigation auto-runs, a status change waits)",
       "result": "pass",
       "detail": "Windows TTS clips"
+    },
+    {
+      "what": "Everything from the new repo location (install, render, hook, server, palette)",
+      "result": "pass",
+      "detail": "repo changes left uncommitted for Jon"
     }
   ],
   "commit_notes": {},
-  "uncommitted": "`D:\\Game Dev` is not a Git repo. Forge's `devlog/` is untracked in the Forge repo; Extraction Game's too.",
+  "uncommitted": "The devlog repo has the moved `skill/`, `.gitignore`, README and corpus updates uncommitted. Forge's and Extraction Game's `devlog/` folders are untracked in their repos.",
   "next_steps": [
+    "Commit and push the devlog repo (skill/ and the corpus updates)",
     "Log the Claude Code CLI in once (the palette's \"Log in to Claude Code\"), then try \"brainstorm ...\" or \"run slice 4\"",
     "Pick which of the further palette ideas to build next"
   ],
@@ -603,7 +634,7 @@
   ],
   "agent": "claude-opus-5-5",
   "started": "2026-10-13T07:05:28.235Z",
-  "ended": "2026-10-13T08:31:53.413Z",
+  "ended": "2026-10-13T16:11:07.362Z",
   "prompt": "setup claude skills and rules to use them. \n\n1. Documentation framework that needs to serve both humans that are reviewing the work that has been done, , and Claude itself. \n\n\nFor human review, for each session, you should generate an HTML page that documents the prompt that was used to start this work, decisions that were made along the way, about what to do, take screenshots and videos of new features as they are added, uh, and document as well as you can the development process of each feature.\n\n For the agent itself, you should set up a framework to store memories of what was worked on, for each feature, and a top-level document guiding the AI in how to um, review this corpus of information about the process. There should be the initial ideation documents, planning documents, overview documents, uh, a nd then like a documentation of work as it progresses, commit by commit, that's handed off to agents.\n\nThis skill should always be used at agents at the end of their work. This applies to sub-projects within game dev, such as Forge or any games that are worked on.",
   "followups": [
     {
@@ -629,6 +660,10 @@
     {
       "at": "2026-10-13T08:20:34.251Z",
       "text": "The home screen search box should not just be a search box, but it should be a command palette to do anything within the devlog app. Um, I want to be able to start ideation. Under a project, I want to be able to start working on a description for a feature. I want to be able to trigger things. I want to be able to navigate through it. And by voice, um, help me come up with other things that we should be able to do through a command palette."
+    },
+    {
+      "at": "2026-10-13T16:08:08.108Z",
+      "text": "the devlog project and the devlog skils need to be combined. I've committed the devlog folder to its own repo. The skills need to be part of that repo"
     }
   ],
   "asked": [
@@ -642,28 +677,41 @@
     }
   ],
   "files_changed": [
-    ".claude/skills/devlog/SKILL.md",
-    ".claude/skills/devlog/reference/capture.md",
-    ".claude/skills/devlog/reference/session-schema.md",
-    ".claude/skills/devlog/scripts/_win.ps1",
-    ".claude/skills/devlog/scripts/capture.ps1",
-    ".claude/skills/devlog/scripts/capture_web.mjs",
-    ".claude/skills/devlog/scripts/devlog.py",
-    ".claude/skills/devlog/scripts/devlog_server.py",
-    ".claude/skills/devlog/scripts/devlog_stt.py",
-    ".claude/skills/devlog/scripts/record.ps1",
-    ".claude/skills/devlog/templates/FEATURE.md",
-    ".claude/skills/devlog/templates/HANDOFF.md",
-    ".claude/skills/devlog/templates/OVERVIEW.md",
-    ".claude/skills/devlog/templates/browse.html",
-    ".claude/skills/devlog/templates/devlog-README.md",
-    ".claude/skills/devlog/templates/ideation-README.md",
-    ".claude/skills/devlog/templates/planning-README.md",
     "CLAUDE.md",
-    "Start-Devlog.bat"
+    "Start-Devlog.bat",
+    "devlog/skill/SKILL.md",
+    "devlog/skill/reference/capture.md",
+    "devlog/skill/reference/session-schema.md",
+    "devlog/skill/scripts/_win.ps1",
+    "devlog/skill/scripts/capture.ps1",
+    "devlog/skill/scripts/capture_web.mjs",
+    "devlog/skill/scripts/devlog.py",
+    "devlog/skill/scripts/devlog_server.py",
+    "devlog/skill/scripts/devlog_stt.py",
+    "devlog/skill/scripts/record.ps1",
+    "devlog/skill/templates/FEATURE.md",
+    "devlog/skill/templates/HANDOFF.md",
+    "devlog/skill/templates/OVERVIEW.md",
+    "devlog/skill/templates/browse.html",
+    "devlog/skill/templates/devlog-README.md",
+    "devlog/skill/templates/ideation-README.md",
+    "devlog/skill/templates/planning-README.md"
   ],
-  "commits": [],
-  "git_status": [],
-  "updated": "2026-10-13T08:31:53Z",
+  "commits": [
+    {
+      "repo": "devlog",
+      "hash": "297fc6aefd5465c13e7edbc9e1a4f0442fd56744",
+      "short": "297fc6a",
+      "at": "2026-10-13T09:00:16-07:00",
+      "subject": "First version of devlog"
+    }
+  ],
+  "git_status": [
+    {
+      "repo": "devlog",
+      "changes": 13
+    }
+  ],
+  "updated": "2026-10-13T16:11:07Z",
   "cwd": "D:\\Game Dev"
 }
